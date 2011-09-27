@@ -1,0 +1,7 @@
+import("Matrix")
+import("numDeriv")
+import("boot")
+
+export("dhglmfit","DHGLMMODELING","plotdhglm")
+
+S3method(summary,dhglm)
