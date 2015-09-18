@@ -78,7 +78,7 @@ specifies xx1 and xx2 as fixed covariates and id11 and id12 as random terms in t
 For Model="dispersion", the random term is not allowed in the linear predictor of the random-effect variance.
 The default (NULL) is set to intercept only model for the corresponding linear predictors.}
 
-\item{RandDistRandVariance}{The option RandDistRandVaraince specifies the
+\item{RandDistRandVariance}{The option RandDistRandVariance specifies the
 distributions for the random terms in the LinPredRandVariance.
 The choice is "gaussian" (default), "gamma", or "inverse-gamma".}
 

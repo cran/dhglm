@@ -1,5 +1,7 @@
 plotdhglm <-
-function (OUTPUT, type="mean", random=NULL) {
+function (OUTPUT,type="mean",random=NULL) {
+    type="mean"
+    random=NULL
     par(mfrow=c(2,2))
     mu<-OUTPUT[2][[1]]
     StudentResidual<-OUTPUT[1][[1]]
@@ -15,4 +17,3 @@ function (OUTPUT, type="mean", random=NULL) {
     qqnorm(StudentResidual); qqline(StudentResidual) # Q-Q plot
     hist(StudentResidual)
 }
-

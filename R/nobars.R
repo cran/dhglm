@@ -22,4 +22,3 @@ function (term)
     term[[3]] <- nb3
     term
 }
-

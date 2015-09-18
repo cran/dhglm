@@ -52,4 +52,3 @@ function (mc, formula, contrasts, vnms = character(0))
     list(Y = Y, X = X, wts = as.double(wts), off = as.double(off), 
         mf = mf, fixef = fixef)
 }
-

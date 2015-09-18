@@ -7,4 +7,3 @@ function (x)
         stop("unparseable formula for grouping factor")
     list(slashTerms(x[[2]]), slashTerms(x[[3]]))
 }
-

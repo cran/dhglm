@@ -8,4 +8,3 @@ RandDistRandVariance="gaussian",LinkRandVariance2=NULL,LinPredRandVariance2=NULL
               RandDistRandVariance,LinkRandVariance2,LinPredRandVariance2)
     return(res)
 }
-

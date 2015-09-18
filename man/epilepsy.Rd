@@ -1,5 +1,5 @@
 \name{data_epilepsy}
-\Rdversion{1.1}
+\Rdversion{1.5}
 \alias{data_epilepsy}
 
 \docType{package}
@@ -26,8 +26,6 @@ visits to the clinic.}
     \item{\code{V}}{Linear trend coded (-3, -1, 1, 3)/10 for four visits of each patient.}
     \item{\code{patient}}{Patient number for 59 epileptics.}
     \item{\code{id}}{Observation number for 236 observations.}
-    \item{\code{phi}}{Inital phi values (=1) to fit the model with residual variances.}
-    \item{\code{lambda}}{Inital lambda values (=1) to fit the model with variances of random effects.}
   }
 }
 

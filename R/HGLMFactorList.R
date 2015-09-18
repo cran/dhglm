@@ -57,4 +57,3 @@ function (formula, fr, rmInt, drop)
     }
     list(Design = Design, Subject = Subject, namesRE = names(bars))
 }
-

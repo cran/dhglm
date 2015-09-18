@@ -13,4 +13,3 @@ function (term)
         return(findbars(term[[2]]))
     c(findbars(term[[2]]), findbars(term[[3]]))
 }
-

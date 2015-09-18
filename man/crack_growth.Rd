@@ -1,5 +1,5 @@
 \name{data_crack_growth}
-\Rdversion{1.1}
+\Rdversion{1.5}
 \alias{data_crack_growth}
 %\alias{dhglm.h}
 
@@ -23,8 +23,6 @@ crack0 to use as a covariate.}
     \item{\code{crack0}}{The previous crack length, l(i,j-1).}
     \item{\code{specimen}}{The specimen number for 21 metallic specimens.}
     \item{\code{cycle}}{The number of cycles/100,000; t(j)=j/100, j=1,...,12.}
-    \item{\code{phi}}{Inital phi values (=1) to fit the model with residual variances.}
-    \item{\code{lambda}}{Inital lambda values (=1) to fit the model with variances of random effects.}
   }
 }
 

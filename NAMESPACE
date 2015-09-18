@@ -1,7 +1,10 @@
 import("Matrix")
 import("numDeriv")
 import("boot")
-
+importFrom("graphics", "hist", "lines", "par", "plot")
+importFrom("stats", "Gamma", "as.formula", "binomial", "dnorm",
+"gaussian", "glm", "is.empty.model", "model.matrix",
+"model.offset", "model.response", "model.weights", "pnorm",
+"poisson", "qqline", "qqnorm", "smooth.spline")
+importFrom("methods","as", "validObject")
 export("dhglmfit","DHGLMMODELING","plotdhglm")
-
-S3method(summary,dhglm)

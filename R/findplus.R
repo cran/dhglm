@@ -16,4 +16,3 @@ function (term)
     if (term[[1]] == as.name("-")) 
         return(-1)
 }
-

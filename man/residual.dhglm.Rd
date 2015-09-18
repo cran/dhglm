@@ -1,5 +1,5 @@
 \name{plotdhglm}
-\Rdversion{1.1}
+\Rdversion{1.5}
 \alias{plotdhglm}
 
 \docType{package}

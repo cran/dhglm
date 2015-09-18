@@ -1,5 +1,5 @@
 \name{dhglmfit}
-\Rdversion{1.1}
+\Rdversion{1.5}
 \alias{dhglmfit}
 
 \docType{package}
@@ -14,7 +14,7 @@ by DHGLMMODELING object preferably created by calling the DHGLMMODELING function
 
 \usage{
 dhglmfit(RespDist="gaussian",BinomialDen=NULL, DataMain, MeanModel=,
-DispersionModel=,PhiFix=NULL,LamFix=NULL,mord=1,dord=1,Maxiter=200,
+DispersionModel=,PhiFix=NULL,LamFix=NULL,mord=0,dord=1,REML=TRUE,Maxiter=200,
 convergence=1e-06)
 }
 
@@ -34,6 +34,7 @@ convergence=1e-06)
      The choice is either 0 or 1 (default).}
   \item{dord}{The option dord specifies the order of Laplace approximation to the adjusted profile likelihood for fitting the dispersion
       parameters. The choice is either 1 (default) or 2.}
+  \item{REML}{logical - indicating whether REML method if it is TRUE (default) or ML method if FALSE are used.}
   \item{Maxiter}{Maxiter determines the maximum number of iterations for estimating all parameters. The default number is 200 iterations.}
   \item{convergence}{Setting this option determines the criterion for convergence, which is computed as the absolute
       difference between the values of all the estimated parameters in the previous and current iterations. The default criterion is 1e-06.}
@@ -75,45 +76,14 @@ model_phi<-DHGLMMODELING(Model="dispersion", Link="log",
 LinPred=phi~cycle+(1|specimen),RandDist="gaussian")
 res_dhglm1<-dhglmfit(RespDist="gamma",DataMain=data_crack_growth,
 MeanModel=model_mu,DispersionModel=model_phi)
-## DHGLM II ##
-model_mu<-DHGLMMODELING(Model="mean", Link="log", 
-LinPred=y~crack0+(1|specimen),RandDist="inverse-gamma",
-LinkRandVariance="log",
-LinPredRandVariance=lambda~1+(1|specimen),
-RandDistRandVariance="gaussian")
-model_phi<-DHGLMMODELING(Model="dispersion", Link="log", 
-LinPred=phi~cycle)
-res_dhglm2<-dhglmfit(RespDist="gamma",DataMain=data_crack_growth,
-MeanModel=model_mu,DispersionModel=model_phi)
-## DHGLM III ##
-model_mu<-DHGLMMODELING(Model="mean", Link="log", 
-LinPred=y~crack0+(1|specimen),RandDist="inverse-gamma",
-         LinkRandVariance="log",
-LinPredRandVariance=lambda~1+(1|specimen),
-RandDistRandVariance="gaussian")
-model_phi<-DHGLMMODELING(Model="dispersion", Link="log", 
-LinPred=phi~cycle+(1|specimen),RandDist="gaussian")
-res_dhglm3<-dhglmfit(RespDist="gamma",DataMain=data_crack_growth,
-MeanModel=model_mu,DispersionModel=model_phi)
-
 
 #### Analysis of epilepsy data ####
 data(data_epilepsy)
-## HGLM 
 model_mu<-DHGLMMODELING(Model="mean", Link="log", 
-LinPred=y~B+T+A+T*B+V+(1|patient)+(1|id),
-RandDist=c("gaussian","gamma"))
+LinPred=y~B+T+A+T*B+V+(1|patient),
+RandDist=c("gaussian"))
 model_phi<-DHGLMMODELING(Model="dispersion")
 res_hglm<-dhglmfit(RespDist="poisson",DataMain=data_epilepsy,
-MeanModel=model_mu,DispersionModel=model_phi)
-## DHGLM
-model_mu<-DHGLMMODELING(Model="mean", Link="log", 
-LinPred=y~B+T+A+T*B+V+(1|patient)+(1|id),
-RandDist=c("gaussian","gaussian"),LinkRandVariance="log",
-LinPredRandVariance=lambda~1+(1|id),
-RandDistRandVariance="inverse-gamma")
-model_phi<-DHGLMMODELING(Model="dispersion")
-res_dhglm<-dhglmfit(RespDist="poisson",DataMain=data_epilepsy,
 MeanModel=model_mu,DispersionModel=model_phi)
 }
 

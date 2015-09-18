@@ -1,6 +1,6 @@
 hglmfit_corr <-
 function(formulaMain,DataMain,Offset=NULL,RespDist="gaussian",RespLink="identity",
-RandDist="gaussian",mord=0,dord=1,spatial=NULL,Neighbor=NULL,Maxiter=200,Iter_mean=2,convergence=10^(-4),
+RandDist="gaussian",mord=0,dord=1,spatial=NULL,Neighbor=NULL,Maxiter=200,Iter_mean=5,convergence=10^(-4),
 Init_lam=0.25,Init_rho=0.174,contrasts=NULL){
     mc <- match.call()
     fr <- HGLMFrames(mc, formulaMain, contrasts)
@@ -17,6 +17,7 @@ Init_lam=0.25,Init_rho=0.174,contrasts=NULL){
     q <- rep(0, nrand)
     for (i in 1:nrand) q[i] <- dim(z[[i]])[2]
     z<-zz<-z[[1]]
+    if (is.null(spatial)) spatial="IND"
     if (spatial=="IAR" && !is.null(Neighbor)) {
           nn<-nrow(Neighbor)
           no<-matrix(0,nn,nn)
@@ -75,10 +76,8 @@ Init_lam=0.25,Init_rho=0.174,contrasts=NULL){
     beta_h[1:p,1]<-c(resglm$coefficients)[1:p]
     if (is.null(Offset)) off<- matrix(0, n,1)
     else off<- Offset
-    rho<-0
-    if (!is.null(spatial)) {
-       if (spatial=="MRF" || spatial=="MRF_Fix") rho<-Init_rho
-    }
+    if (spatial=="MRF" || spatial=="MRF_Fix") rho<-Init_rho
+    else rho<-0
 convergence1<-1
 max_iter<-1
 while (convergence1>convergence && max_iter<=Maxiter ) {
@@ -111,14 +110,14 @@ for(k in 1:Iter_mean) {
        lambda[index1:qcum[i+1]]<-alpha_h[i]
     } 
     I<-diag(rep(1,qcum[nrand+1]))
-    if (!is.null(spatial)) {
     if (spatial=="MRF" || spatial=="MRF_Fix") {
-        pW2<-(I-rho*Neighbor)
-        W2<-pW2/as.vector(lambda)
-    }} else {
+           pW2<-(I-rho*Neighbor)
+           W2<-pW2/as.vector(lambda)
+    } else {
         pW2<-I
         W2<-diag(1/as.vector(lambda))
     }
+
 ##############################################################
 ############# random effect  #################################
 ##############################################################
@@ -236,11 +235,10 @@ for(k in 1:Iter_mean) {
     Q<-invSig-invSig%*%x%*%solve(t(x)%*%invSig%*%x)%*%t(x)%*%invSig
     lam<-alpha_h[1]
 #### 1: lam(variance component) , 2: rho
-    if (!is.null(spatial)) {
-    if (spatial=="MRF" || spatial=="MRF_Fix") {
-        pW2<-(I-rho*Neighbor)
-        W2<-pW2/as.vector(lambda)
-    }} else {
+     if (spatial=="MRF" || spatial=="MRF_Fix") {
+           pW2<-(I-rho*Neighbor)
+           W2<-pW2/as.vector(lambda)
+    } else {
         rho<-0
         pW2<-I
         W2<-diag(1/as.vector(lambda))
@@ -325,7 +323,7 @@ for(k in 1:Iter_mean) {
     convergence1<-sum(abs(clam-old_clam))
     lam<-clam[1]
     rho<-clam[2]
-    if (!is.null(spatial) && spatial=="MRF_Fix") rho<-Init_rho
+    if (spatial=="MRF_Fix") rho<-Init_rho
     alpha_h[1]<-lam
     max_iter<-max_iter+1
     print_i<-max_iter
@@ -338,11 +336,10 @@ for(k in 1:Iter_mean) {
        lambda[index1:qcum[i+1]]<-alpha_h[i]
     } 
     I<-diag(rep(1,qcum[nrand+1]))
-    if (!is.null(spatial)) { 
     if (spatial=="MRF" || spatial=="MRF_Fix") {
         pW2<-(I-rho*Neighbor)
         W2<-pW2/as.vector(lambda)
-    }} else {
+    } else {
         rho<-0
         pW2<-I
         W2<-diag(1/as.vector(lambda))
@@ -546,4 +543,3 @@ for(k in 1:Iter_mean) {
     res<-list(namesX,beta_h,se_beta,lam,rho,clam_se,v_h,like_value,hlikeli1,mu,W2,se_lam,se_rho,A)
     return(res)
 }
-
