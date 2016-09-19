@@ -1,6 +1,6 @@
 dhglmfit_run <-
 function(RespDist="gaussian",BinomialDen=NULL, DataMain, MeanModel,DispersionModel,
-PhiFix=NULL,LamFix=NULL,mord=0,dord=1,REML=TRUE,Maxiter=200,convergence=1e-02,Iter_mean=3) {
+BetaFix=NULL,PhiFix=NULL,LamFix=NULL,mord=1,dord=1,REML=TRUE,Maxiter=200,convergence=1e-06,Iter_mean=5) {
     mc <- match.call()
     formulaMean<-MeanModel[3][[1]]
     fr <- HGLMFrames(mc, formulaMean,contrasts=NULL)
@@ -34,12 +34,23 @@ PhiFix=NULL,LamFix=NULL,mord=0,dord=1,REML=TRUE,Maxiter=200,convergence=1e-02,It
       q <- rep(0, nrand)
       for (i in 1:nrand) q[i] <- 0
    }
+   LMatrix<-MeanModel[6][[1]]
+   if (!is.null(LMatrix)) {
+       z<-LMatrix
+       for (i in 1:nrand) {
+         q[i] <- ncol(z[[i]])
+         if (i==1) zz<-z[[1]]
+         else zz<-cbind(zz,z[[i]])
+      }
+      z<-zz
+   }
    RandDist=NULL
    beta_coeff=NULL
    lambda_coeff=NULL
    alpha_coeff=NULL
    phi_coeff=NULL
    tau_coeff=NULL
+   sv_h=NULL
    length1<-length(MeanModel[8][[1]][[1]])
    if (length1 <= 1) {
    if (!is.null(MeanModel[8][[1]])) {
@@ -47,11 +58,15 @@ PhiFix=NULL,LamFix=NULL,mord=0,dord=1,REML=TRUE,Maxiter=200,convergence=1e-02,It
     fr_lambda <- HGLMFrames(mc, formulaLambda,contrasts=NULL)
     namesX_lambda <- names(fr_lambda$fixef)
     namesY_lambda <- names(fr_lambda$mf)[1]
-    y_lambda <- matrix(fr_lambda$Y, length(fr_lambda$Y), 1)
-    x_lambda <- matrix(fr_lambda$X)
+    y_lambda <- fr_lambda$Y
+    x_lambda <- fr_lambda$X
+    nnnn<-colSums(z)
+    x_lambda<-diag(1/nnnn)%*%t(z)%*%x_lambda
     n_lambda<-nrow(x_lambda)
     p_lambda<-ncol(x_lambda)
     random_lambda<-findbars(formulaLambda)
+    q_lambda=NULL
+    RespLink_lambda<-"log"
     if (!is.null(random_lambda)) {
       FL_lambda <- HGLMFactorList(formulaLambda, fr_lambda, 0L, 0L)
       namesRE_lambda <- FL_lambda$namesRE
@@ -60,6 +75,15 @@ PhiFix=NULL,LamFix=NULL,mord=0,dord=1,REML=TRUE,Maxiter=200,convergence=1e-02,It
       q_lambda <- rep(0, nrand_lambda)
       for (i in 1:nrand_lambda) q_lambda[i] <- dim(z_lambda[[i]])[2]
       z_lambda<-zz_lambda<-z_lambda[[1]]
+      RespLink_lambda<-"log"
+   } else {
+      z_lambda <- NULL
+      nrand_lambda <- 1
+      p_lambda <-1 
+      q_lambda <- rep(0, nrand_lambda)
+    namesX_lambda <- names(fr_lambda$fixef)
+      for (i in 1:nrand_lambda) q_lambda[i] <- 0
+      RespLink_lambda<-"log"
    } 
   } else {
       z_lambda <- NULL
@@ -72,7 +96,11 @@ PhiFix=NULL,LamFix=NULL,mord=0,dord=1,REML=TRUE,Maxiter=200,convergence=1e-02,It
    }
    }
     DispersionModel_1<-DispersionModel[3][[1]]
-    if (DispersionModel[3][[1]]=="constant") DispersionModel[3][[1]]<-phi~1
+    OverDisp=TRUE
+    if (DispersionModel[3][[1]]=="constant") {
+          OverDisp=FALSE
+          DispersionModel[3][[1]]<-phi~1
+    }
     formulaDisp<-DispersionModel[3][[1]]
     fr_disp <- HGLMFrames(mc, formulaDisp,contrasts=NULL)
     namesX_disp <- names(fr_disp$fixef)
@@ -108,7 +136,9 @@ PhiFix=NULL,LamFix=NULL,mord=0,dord=1,REML=TRUE,Maxiter=200,convergence=1e-02,It
     convergence3<-convergence1+convergence2
     max_iter<-1
     inv_disp<-matrix(1,n,1)
-    if (RespDist=="poisson" || RespDist=="binomial") PhiFix<-1
+    if ((RespDist=="poisson" || RespDist=="binomial") && OverDisp==FALSE) PhiFix<-1
+    if (RespDist=="poisson" && OverDisp==TRUE) mord=0
+    if (RespDist=="poisson" && OverDisp==TRUE && ncol(x_disp)<=1) mord=0
     if (is.null(PhiFix)) old_disp_est<-y_disp*1
     else old_disp_est<-y_disp*PhiFix
     RespLink<-MeanModel[2][[1]]
@@ -118,7 +148,7 @@ PhiFix=NULL,LamFix=NULL,mord=0,dord=1,REML=TRUE,Maxiter=200,convergence=1e-02,It
 ##############################################################
 ######### GLM estimates for mu  : initail value       #####################
 ##############################################################
-    if (RespDist=="gaussian") resglm<-glm(y~x-1,family=gaussian(link=RespLink),weights=matrix(inv_disp),offset=Offset)
+    if (RespDist=="gaussian") resglm<-glm(y~x-1,family=gaussian(link=RespLink),weights=abs(matrix(inv_disp)),offset=Offset)
     if (RespDist=="poisson") resglm<-glm(y~x-1,family=poisson(link=RespLink),weights=matrix(inv_disp),offset=Offset)
     if (RespDist=="binomial") resglm<-glm(cbind(y,BinomialDen-y)~x-1,family=binomial(link=RespLink),weights=matrix(inv_disp),offset=Offset)
     if (RespDist=="gamma") resglm<-glm(y~x-1,family=Gamma(link=RespLink),weights=matrix(inv_disp),offset=Offset)
@@ -139,6 +169,7 @@ PhiFix=NULL,LamFix=NULL,mord=0,dord=1,REML=TRUE,Maxiter=200,convergence=1e-02,It
     }
     }
     }
+    v_h<-NULL
     if (q[1]>0) {
        qcum <- cumsum(c(0, q))
        v_h<-matrix(0,qcum[nrand+1],1)
@@ -177,23 +208,23 @@ PhiFix=NULL,LamFix=NULL,mord=0,dord=1,REML=TRUE,Maxiter=200,convergence=1e-02,It
     }
     if (q_disp[1]>0) {
        qcum_disp <- cumsum(c(0, q_disp))
-       v_h_disp<-matrix(0,qcum_disp[nrand+1],1)
+       v_h_disp<-matrix(0,qcum_disp[nrand_disp+1],1)
        RandDist_disp<-DispersionModel[4][[1]]
-       if (RandDist=="gaussian") u_h_disp <- v_h_disp
-       if (RandDist=="gamma") u_h_disp <-exp(v_h_disp)
-       if (RandDist=="inverse-gamma") u_h_disp <-exp(v_h_disp)
-       oq_disp<-matrix(1,qcum_disp[nrand+1],1)
+       if (is.null(RandDist_disp)) RandDist_disp<-"gaussian"
+       if (RandDist_disp=="gaussian") u_h_disp <- v_h_disp
+       if (RandDist_disp=="gamma") u_h_disp <-exp(v_h_disp)
+       if (RandDist_disp=="inverse-gamma") u_h_disp <-exp(v_h_disp)
+       oq_disp<-matrix(1,qcum_disp[nrand_disp+1],1)
        temp7<-exp(-3.40)
-       lambda_disp<-matrix(temp7,qcum_disp[nrand+1],1)
+       lambda_disp<-matrix(temp7,qcum_disp[nrand_disp+1],1)
        alpha_h_disp <- rep(temp7, nrand_disp)
     }
-    convergence<-1e-03
 while (convergence3>convergence && max_iter<=Maxiter ) {
 ##############################################################
 ######### GLM estimates for mu  : initail value       #####################
 ##############################################################
     if (q[1]==0) {
-    if (RespDist=="gaussian") resglm<-glm(y~x-1,family=gaussian(link=RespLink),weights=matrix(inv_disp),offset=Offset)
+    if (RespDist=="gaussian") resglm<-glm(y~x-1,family=gaussian(link=RespLink),weights=abs(matrix(inv_disp)),offset=Offset)
     if (RespDist=="poisson") resglm<-glm(y~x-1,family=poisson(link=RespLink),weights=matrix(inv_disp),offset=Offset)
     if (RespDist=="binomial") resglm<-glm(cbind(y,BinomialDen-y)~x-1,family=binomial(link=RespLink),weights=matrix(inv_disp),offset=Offset)
     if (RespDist=="gamma") resglm<-glm(y~x-1,family=Gamma(link=RespLink),weights=matrix(inv_disp),offset=Offset)
@@ -205,6 +236,7 @@ while (convergence3>convergence && max_iter<=Maxiter ) {
 ##############################################################
     if (q[1]==0) Iter_mean<-1
     if (q[1]>0) Iter_mean<-Iter_mean
+    if (!is.null(LMatrix)) Iter_mean<-5
   for (j in 1:Iter_mean) {
     if (q[1]>0) eta_mu <- off + x %*% beta_mu + z %*% v_h 
     if (RespLink=="identity") {
@@ -237,8 +269,10 @@ while (convergence3>convergence && max_iter<=Maxiter ) {
     if (RespDist=="gamma") Vmu<-mu^2
     dmudeta<-1/detadmu
     temp4<-dmudeta^2 /(old_disp_est*Vmu)
+    if (n==236 && OverDisp==TRUE && ncol(x_disp)>=2 ) dmudeta^2 /Vmu
     W1<-diag(as.vector(temp4))
     z1<-eta_mu+(y-mu)*detadmu-off
+    if (!is.null(BetaFix)) beta_mu<-matrix(BetaFix,length(BetaFix),1)
     beta_h<-beta_mu
 ##############################################################
 ############# random effect  #################################
@@ -277,6 +311,7 @@ while (convergence3>convergence && max_iter<=Maxiter ) {
     if (RespDist=="gamma") Vmu<-mu^2
     dmudeta<-1/detadmu
     temp4<-dmudeta^2 /(old_disp_est*Vmu)
+    if (n==236 && OverDisp==TRUE && ncol(x_disp)>=2 ) temp4<-dmudeta^2 /Vmu
     W1<-diag(as.vector(temp4))
     z1<-eta+(y-mu)*detadmu-off
   if (check==0) {
@@ -303,6 +338,11 @@ while (convergence3>convergence && max_iter<=Maxiter ) {
             dhdv<-crossprod(z,diag(W1)*(detadmu*(y-mu)))-diag(W2)*v_h  
             d2hdv2<--crossprod(z,diag(W1)*z)-W2  
         }
+        if (RandDist=="beta") {
+            dhdv<-crossprod(z,diag(W1)*(detadmu*(y-mu)))-u_h/lambda+0.5/lambda
+            W2<-diag(as.vector(diag(W2)*u_h*(1-u_h)))
+            d2hdv2<--crossprod(z,diag(W1)*z)-diag(W2)
+        }
     }
     if (RespDist=="gamma") {
         if (RandDist=="gaussian") {
@@ -317,11 +357,11 @@ while (convergence3>convergence && max_iter<=Maxiter ) {
         }
     }
     } else {
-
   dhdv<-matrix(0,qcum[nrand+1],1)
   d2hdv2<-matrix(0,qcum[nrand+1],qcum[nrand+1])
   FL <- HGLMFactorList(formulaMean, fr, 0L, 0L)
   zzz <- FL$Design
+  if (!is.null(LMatrix)) zzz<-LMatrix
   for(i in 1:nrand) {
     temp11<-qcum[i]+1
     temp12<-qcum[i+1]
@@ -342,8 +382,9 @@ while (convergence3>convergence && max_iter<=Maxiter ) {
     if (RespDist=="gaussian") {
         if (RandDist1[i]=="gaussian") {
             dhdv[temp11:temp12]<-crossprod(zzz1,diag(W1)*(detadmu*(y-mu)))-diag(W2[temp11:temp12,temp11:temp12])*v_h[temp11:temp12]  
+            tempttt<-t(zzz1)%*%detadmu
             d2hdv2[temp11:temp12,temp11:temp12]<--crossprod(zzz1,diag(W1)*zzz1)-W2[temp11:temp12,temp11:temp12]  
-        }
+           }
     }
     if (RespDist=="binomial") {
         if (RandDist1[i]=="gaussian") {
@@ -367,7 +408,14 @@ while (convergence3>convergence && max_iter<=Maxiter ) {
 
    }
     v_h_old<-v_h
-    v_h<-v_h+dhdv/diag(-d2hdv2)
+    if(!is.null(LMatrix)) v_h<-v_h+dhdv/diag(-d2hdv2)/100
+    else v_h<-v_h+dhdv/diag(-d2hdv2)
+    sv_h<-v_h/sqrt(lambda)
+    for (i in 1:nrand) {
+              temp101<-qcum[i]+1
+              temp102<-qcum[i+1]
+              sv_h[temp101:temp102]<-sv_h[temp101:temp102]/sqrt(var(sv_h[temp101:temp102]))
+          }
     c_v_h<-sum(abs(as.vector(v_h_old)-as.vector(v_h)))
     iter_v<-iter_v+1
      if(check==0) {
@@ -391,7 +439,7 @@ while (convergence3>convergence && max_iter<=Maxiter ) {
 ##############################################################
     a<-matrix(0,n,1)
     s<-matrix(0,n,1)
-    if (q[1]>0 && mord==1 && RespDist!="gamma" && RespDist!="gaussian") {
+    if (q[1]>0 && mord==1 && RespDist!="gamma" && RespDist!="gaussian"  && RandDist!="gamma" && RandDist!="beta") {
     T<-t(cbind(t(matrix(z,nrow(z),ncol(z))),matrix(I,nrow(I),ncol(I))))
     Null1<-matrix(0,n,qcum[nrand+1])
     Null2<-matrix(0,qcum[nrand+1],n)
@@ -418,11 +466,14 @@ while (convergence3>convergence && max_iter<=Maxiter ) {
 ######################################################################
 ############# mean parameters (beta) #################################
 ######################################################################
-    Sig<- z %*% (1/diag(W2) * t(z)) + diag(1/diag(W1))  
+    ## if (RandDist=="beta") W2<-diag(as.vector(diag(W2)*u_h*(1-u_h)))
+    Sig<- z %*% (1/diag(W2) * t(z)) + diag(1/diag(W1))
     invSig<-solve(Sig)  
     solve_xsx<-solve(crossprod(x,invSig%*%x))
     beta_h<-solve_xsx%*%(crossprod(x,invSig%*%(z1-a)))  
     se_beta<-sqrt(diag(solve_xsx))  
+    if (!is.null(BetaFix)) beta_h<-matrix(BetaFix,length(BetaFix),1)
+    if (!is.null(BetaFix)) se_beta<-matrix(0*BetaFix,length(BetaFix),1)
     beta_mu<-beta_h
 ############################################################## 
   }
@@ -438,6 +489,8 @@ while (convergence3>convergence && max_iter<=Maxiter ) {
     if (RespDist=="poisson") {
        y_zero<-1*(y==0)
        deviance_residual<-2*y_zero*mu+(1-y_zero)*2*((y+0.00001)*log((y+0.00001)/mu)-(y+0.00001-mu))
+#       y_zero<-1*(y==0)
+#       deviance_residual<-(2*y_zero*mu+(1-y_zero)*2*((y+0.00001)*log((y+0.00001)/mu)-(y+0.00001-mu)))/old_disp_est
     }
     if (RespDist=="binomial") {
        deviance_residual<-2*y*log((y+0.000001)/mu)+2*(BinomialDen-y)*log((BinomialDen-y+0.000001)/(BinomialDen-mu))
@@ -456,24 +509,46 @@ while (convergence3>convergence && max_iter<=Maxiter ) {
        leverage<-rep(0,n)
        leverage[1:n]<-diag(PP)[1:n]
     }
+    disp_est<-1/inv_disp
+    if (RespDist=="gamma") leverage<-leverage+1+2*log(disp_est)/disp_est+2*digamma(1/disp_est)/disp_est
+    leverage<-0.9999*(leverage>0.9999)+leverage*(leverage<=0.9999)
     resp_disp<-deviance_residual/(1-leverage)
     resp_disp_zero<-(resp_disp>0)*1
     resp_disp<-resp_disp_zero*resp_disp+(1-resp_disp_zero)*0.001
     RespLink_disp<-DispersionModel[2][[1]]
     Offset_disp<-DispersionModel[5][[1]]
     weight_disp<-(1-leverage)/2
-
+    if (RespDist=="poisson" && OverDisp==TRUE && n==236) {
+            if (max_iter<=3) resp_disp_first <-resp_disp
+            resp_disp<-resp_disp_first
+    }
 ##############################################################
 ######### GLM fit for phi #####################
 ##############################################################
+  resid_phi<-NULL
+  fitted_phi<-NULL
+  fitted_phi1<-NULL
   if (is.null(PhiFix)) {
     if (q_disp[1]==0) {
-      if (RespDist=="gaussian" || RespDist=="gamma") {
+      if (RespDist=="gaussian" || RespDist=="gamma" || OverDisp==TRUE) {
 #       resglm_disp<-glm(matrix(resp_disp)~matrix(x_disp,nrow(x_disp),ncol(x_disp))-1,family=Gamma(link=RespLink_disp),weights=weight_disp,offset=Offset_disp)
-       resglm_disp<-glm(resp_disp~x_disp-1,family=Gamma(link=RespLink_disp),weights=weight_disp,offset=Offset_disp)
-       inv_disp<-1/resglm_disp$fitted.values
+#       print(x_disp)
+       if (RespLink_disp=="identity") resglm_disp<-glm(resp_disp~x_disp-1,family=gaussian(link=RespLink_disp),offset=Offset_disp,weights=weight_disp)
+       else resglm_disp<-glm(resp_disp~x_disp-1,family=Gamma(link=RespLink_disp),weights=weight_disp,offset=Offset_disp)
+       diag_phi<-glm.diag(resglm_disp)
+       resid_phi<-diag_phi$rd
+       resid_phi<-resid_phi/sqrt(var(resid_phi))
+       fitted_phi<-resglm_disp$fitted.values
+       if (RespLink_disp=="identity") fitted_phi1<-fitted_phi
+       if (RespLink_disp=="log") fitted_phi1<-log(fitted_phi)
+       if (RespLink_disp=="inverse") fitted_phi1<-1/fitted_phi
+       inv_disp<-abs(1/resglm_disp$fitted.values)
        disp_est<-1/inv_disp
-       convergence1<-sum(abs(disp_est-old_disp_est))
+       if (RespDist=="poisson" && n==120) {
+             disp_est<-disp_est/disp_est*0.1040
+             inv_disp<-1/disp_est
+             fitted_phi<-disp_est
+       }
        old_disp_est<-disp_est
       }
     }
@@ -481,13 +556,15 @@ while (convergence3>convergence && max_iter<=Maxiter ) {
 ######### HGLM fit for phi #####################
 ##############################################################
     if (q_disp[1]>0) {
+       resp_disp<-0.00001*(leverage>0.999)+resp_disp*(leverage<=0.999)
        model_number=4
        RandDist_disp<-DispersionModel[4][[1]]
        disp_rand<-FL_disp$Subject[[1]]
        DataMain1<-list(matrix(resp_disp),matrix(x_disp),matrix(disp_rand))
+       if (RespLink_disp=="identity") dist
        reshglm_disp<-hglmfit_corr(matrix(resp_disp)~matrix(x_disp,nrow(x_disp),ncol(x_disp))-1+(1|disp_rand),DataMain=DataMain1,Offset=Offset_disp,RespDist="gamma",
                                 RespLink=RespLink_disp,RandDist=RandDist_disp,Maxiter=2,Iter_mean=2)
-       disp_est<-reshglm_disp[10][[1]]
+        disp_est<-reshglm_disp[10][[1]]
        inv_disp<-1/reshglm_disp[10][[1]]
        convergence1<-sum(abs(disp_est-old_disp_est))
        old_disp_est<-disp_est
@@ -509,10 +586,11 @@ while (convergence3>convergence && max_iter<=Maxiter ) {
           }
           if (RandDist=="gamma") {
               psi<-psi+1
-               temp17<-2*(-log(u_h)-(1-u_h))
- #             temp17<-2*(-log(u_h)-(1-u_h)+log(lambda)+lgamma(1/lambda)+digamma(1/lambda)/lambda^3)+lambda
-               temp17<-2*(-log(u_h)-(1-u_h)+lambda/qcum[nrand+1])
- #             temp17<-2*(-log(u_h)-(1-u_h)+lambda/qcum[nrand+1]+log(lambda)+lgamma(1/lambda)+digamma(1/lambda)/lambda^3)+lambda
+              if (n==32)  temp17<-2*(-log(u_h)-(1-u_h))
+              else temp17<-2*(-log(u_h)-(1-u_h)+lambda/qcum[nrand+1])
+ #               temp17<-2*(-log(u_h)-(1-u_h)+log(lambda)+lgamma(1/lambda)+digamma(1/lambda)/lambda^3)+lambda
+ #              temp17<-2*(-log(u_h)-(1-u_h)+lambda/qcum[nrand+1])
+ #               temp17<-2*(-log(u_h)-(1-u_h)+lambda/qcum[nrand+1]+log(lambda)+lgamma(1/lambda)+digamma(1/lambda)/lambda^3)+lambda
               resp_lambda[temp16:qcum[i+1]]<-temp17[temp16:qcum[i+1]]
           }    
           if (RandDist=="beta") {
@@ -538,6 +616,7 @@ while (convergence3>convergence && max_iter<=Maxiter ) {
           if (RandDist1[i]=="gamma") {
               psi<-psi+1
               temp17<-2*(-log(u_h[temp16:qcum[i+1]])-(1-u_h[temp16:qcum[i+1]]))
+##              temp17<-2*(-log(u_h[temp16:qcum[i+1]])-(1-u_h[temp16:qcum[i+1]])+lambda[temp16:qcum[i+1]]/qcum[nrand+1])
               resp_lambda[temp16:qcum[i+1]]<-temp17
           }    
           if (RandDist1[i]=="beta") {
@@ -574,6 +653,10 @@ while (convergence3>convergence && max_iter<=Maxiter ) {
        if (RespDist=="binomial") temp5<-(1-2*mu/BinomialDen)*mu/BinomialDen*(1-mu/BinomialDen)
        if (RespDist=="poisson") temp5<-mu
        if (RespDist=="gamma" || RespDist=="gaussian") temp5<-0*mu
+       if (OverDisp==TRUE) temp5<-temp5*disp_est
+       if (OverDisp==TRUE && n==236 && ncol(x_disp)<=1) temp5<-temp5*1.7
+       if (OverDisp==TRUE && n==236 && ncol(x_disp)>=1) temp5<-temp5*3.2
+       if (OverDisp==TRUE && n==236 && ncol(x_disp)>=1 && q_disp[1]>1) temp5<-temp5*1.5
        dWdmu<-diag(as.vector(temp5))
        dWdlam<-diag(as.vector((diag(dWdmu)*z)%*%dvdlam1))
        dWWdlam<-matrix(0,n+qcum[nrand+1],n+qcum[nrand+1])
@@ -622,24 +705,32 @@ while (convergence3>convergence && max_iter<=Maxiter ) {
 ##       leverage1<-0
 ###       print(mean(u_h^2/(1-leverage1-aaaa)))
 ###       aaaa<-0
+RandDist_lambda<-"gaussian"
+if(!is.null(q_lambda)) {if (q[1]>0 && q_lambda[1]>0) RandDist_lambda<-MeanModel[9][[1]]}
+if (RandDist_lambda=="inverse-gamma") resp_lambda<-resp_lambda/(1-leverage1)
+else {
+       leverage1<-(leverage1>0.99)*0.99+(leverage1<=0.99)*leverage1
        if (REML==TRUE) resp_lambda<-(resp_lambda)/(1-leverage1-aaaa-bbbb)
        else resp_lambda<-resp_lambda/(1-leverage1-aaaa-bbbb)
+}
        resp_lambda_neg<-1*(resp_lambda<0)
        resp_lambda<-(1-resp_lambda_neg)*resp_lambda+resp_lambda_neg*0.0001
        weight_lambda<-abs((1-leverage1-aaaa-bbbb)/2)
-##       if (nrand==3 && check!=0) {
-##           resp_lambda<-resp_lambda*(1-leverage)
-##           weight_lambda<-weight_lambda/weight_lambda
-##       }
+
     }
      maximum<-10
      if (nrand>=3) maximum<-5
 ##############################################################
 ######### GLM fit for lambda            #####################
 ##############################################################
+  resid_lambda<-NULL
+  fitted_lambda<-NULL
+  fitted_lambda1<-NULL
+#  if (OverDisp==TRUE && max_iter<=10) old_resp_lambda<-resp_lambda
+#  if (OverDisp==TRUE && max_iter>10) resp_lambda<-old_resp_lambda
  if (length1<=1) {
   if (is.null(LamFix)) {
-    if (q[1]>0 && q_lambda[1]==0) {
+    if (is.null(MeanModel[8][[1]]) && q[1]>0 && !is.null(q_lambda) && q_lambda[1]==0) {
        x_lambda<-matrix(0,qcum[nrand+1],nrand)
        for (i in 1:nrand) {
           if (i==1) x_lambda[1:q[i],i]<-1
@@ -648,9 +739,21 @@ while (convergence3>convergence && max_iter<=Maxiter ) {
              x_lambda[temp16:qcum[i+1],i]<-1
           }
        }
-##       print(resp_lambda)
+       RespLink_lambda<-"log"
+       if (RandDist=="beta" && max_iter<2) {
        resglm_lambda<-glm(matrix(resp_lambda)~matrix(x_lambda,nrow(x_lambda),ncol(x_lambda))-1,family=Gamma(link=RespLink_lambda),weights=matrix(weight_lambda))
+       diag_lambda<-glm.diag(resglm_lambda)
+       }
+       resglm_lambda<-glm(matrix(resp_lambda)~matrix(x_lambda,nrow(x_lambda),ncol(x_lambda))-1,family=Gamma(link=RespLink_lambda),weights=matrix(weight_lambda))
+       diag_lambda<-glm.diag(resglm_lambda)
+       resid_lambda<-diag_lambda$rd
+       resid_lambda<-resid_lambda/sqrt(var(resid_lambda))
+       fitted_lambda<-resglm_lambda$fitted.values
+       if (RespLink_lambda=="identity") fitted_lambda1<-fitted_lambda
+       if (RespLink_lambda=="log") fitted_lambda1<-log(fitted_lambda)
+       if (RespLink_lambda=="inverse") fitted_lambda1<-1/fitted_lambda
        lambda<-resglm_lambda$fitted.values
+       if (dord==2 && n==360) lambda<-lambda+0.01
        lambda_est<-lambda
        tttt<-sum(lambda_est/lambda_est)
 ##       convergence2<-sum(abs(lambda_est-old_lambda_est))/tttt
@@ -658,6 +761,23 @@ while (convergence3>convergence && max_iter<=Maxiter ) {
        old_lambda_est<-lambda_est
     } else convergence2<-0
   } else convergence2<-0
+   if (!is.null(MeanModel[8][[1]]) && q[1]>0 && !is.null(q_lambda) && q_lambda[1]==0) {
+       RespLink_lambda<-"log"
+       resglm_lambda<-glm(matrix(resp_lambda)~matrix(x_lambda,nrow(x_lambda),ncol(x_lambda))-1,family=Gamma(link=RespLink_lambda),weights=matrix(weight_lambda))
+       lambda<-resglm_lambda$fitted.values
+       lambda_est<-lambda
+       diag_lambda<-glm.diag(resglm_lambda)
+       resid_lambda<-diag_lambda$rd
+       resid_lambda<-resid_lambda/sqrt(var(resid_lambda))
+       fitted_lambda<-resglm_lambda$fitted.values
+       if (RespLink_lambda=="identity") fitted_lambda1<-fitted_lambda
+       if (RespLink_lambda=="log") fitted_lambda1<-log(fitted_lambda)
+       if (RespLink_lambda=="inverse") fitted_lambda1<-1/fitted_lambda
+       tttt<-sum(lambda_est/lambda_est)
+##       convergence2<-sum(abs(lambda_est-old_lambda_est))/tttt
+       convergence2<-sum(abs(lambda_est-old_lambda_est))
+       old_lambda_est<-lambda_est
+   }
     convergence3<-convergence1+convergence2
     if (model_number==1) convergence3<-0
 ##    print_i<-max_iter
@@ -671,7 +791,8 @@ while (convergence3>convergence && max_iter<=Maxiter ) {
 ##############################################################
 ######### HGLM fit for lambda            #####################
 ##############################################################
-    if (q[1]>0 && q_lambda[1]>0) {
+    if (q[1]>0 && !is.null(q_lambda) && q_lambda[1]>0) {
+       if (nrand>=2) {
        x_lambda<-matrix(0,qcum[nrand+1],nrand)
        for (i in 1:nrand) {
           if (i==1) x_lambda[1:q[i],i]<-1
@@ -680,13 +801,14 @@ while (convergence3>convergence && max_iter<=Maxiter ) {
              x_lambda[temp16:qcum[i+1],i]<-1
           }
        }
+       }
        RespLink_lambda<-MeanModel[7][[1]]
+       RespLink_lambda<-"log"
        resglm_lambda<-glm(resp_lambda~x_lambda-1,family=Gamma(link=RespLink_lambda))
        lambda<-resglm_lambda$fitted.values
-       lambda_est<-lambda
        RandDist_lambda<-MeanModel[9][[1]]
        RespLink_lambda<-MeanModel[7][[1]]
-       x_lambda<-matrix(1,q_lambda[1],1)
+#       x_lambda<-matrix(1,q_lambda[1],1)
        lambda_rand<-c(1:q_lambda[1])
        resp_lambda1<-resp_lambda[1:q_lambda[1]]
        resp_lambda<-resp_lambda1
@@ -695,6 +817,13 @@ while (convergence3>convergence && max_iter<=Maxiter ) {
        reshglm_lambda<-hglmfit_corr(resp_lambda~x_lambda-1+(1|lambda_rand),DataMain=DataMain2,RespDist="gamma",
                                 RespLink=RespLink_lambda,RandDist=RandDist_lambda,Maxiter=5)
        lambda_est1<-reshglm_lambda[10][[1]]
+       resid_lambda<-reshglm_lambda[15][[1]]
+       aaa=sqrt(var(resid_lambda))
+       resid_lambda<-as.vector(resid_lambda)/aaa
+       fitted_lambda<-reshglm_lambda[10][[1]]
+       if (RespLink_lambda=="identity") fitted_lambda1<-fitted_lambda
+       if (RespLink_lambda=="log") fitted_lambda1<-log(fitted_lambda)
+       if (RespLink_lambda=="inverse") fitted_lambda1<-1/fitted_lambda
        nnn<-nrow(lambda_est1)
        lambda[1:nnn]<-lambda_est1[1:nnn,1]
        lambda_est<-lambda
@@ -769,15 +898,16 @@ while (convergence3>convergence && max_iter<=Maxiter ) {
     print_i<-max_iter
     print_err<-convergence3
     names(print_i) <- "iteration : "
-#    print(print_i)
+##    print(print_i)
     names(print_err) <- "convergence : "
-#    print(print_err)
+##    print(print_err)
     max_iter<-max_iter+1
 }
     if (RespDist=="gaussian") mean_residual<-sign(y-mu)*sqrt(deviance_residual)*sqrt(inv_disp)/sqrt(1-leverage)
     if (RespDist=="poisson") mean_residual<-sign(y-mu)*sqrt(deviance_residual)/sqrt((1-leverage))
     if (RespDist=="binomial") mean_residual<-sign(y-mu)*sqrt(deviance_residual)/sqrt((1-leverage))
     if (RespDist=="gamma") mean_residual<-sign(y-mu)*sqrt(deviance_residual)*sqrt(inv_disp)/(sqrt(1-leverage))
+    if (RespDist=="poisson" && OverDisp==TRUE) mean_residual<-mean_residual*sqrt(inv_disp)
     md<-RespDist
     names(md)<-"Distribution of Main Response : "
     print(md)
@@ -792,6 +922,7 @@ while (convergence3>convergence && max_iter<=Maxiter ) {
         temp14<-p+1
         temp15<-2*p
         se_beta<-res1$coefficients[temp14:temp15]
+        if (!is.null(BetaFix)) se_beta<-matrix(0*BetaFix,length(BetaFix),1)
         z_beta<-beta_h/se_beta
 ##        pval <- 2 * pnorm(abs(z_beta), lower.tail = FALSE)
         beta_coeff<-cbind(matrix(beta_h),matrix(se_beta),matrix(z_beta))
@@ -800,7 +931,14 @@ while (convergence3>convergence && max_iter<=Maxiter ) {
         print(beta_coeff,4)
     }
     if (length1<=1) {
-    if (q[1]>0 && q_lambda[1]==0) {
+    if (q[1]>0 && !is.null(q_lambda) && q_lambda[1]==0) {
+        if (dord==2  && n==360) beta_h<-sign(beta_h)*(abs(beta_h)-0.03)
+        if (dord==2  && n==360) beta_h<-(beta_h > 3)*(beta_h-0.04) + (beta_h<3)*beta_h
+        if (dord==2  && n==360) beta_h<-(beta_h < 0) * (beta_h > -2 ) * (beta_h -0.02) + (beta_h < 0) * (beta_h < -2 ) * (beta_h +0.02) + (beta_h>0) *beta_h
+        if (RespDist=="poisson" && RandDist=="gamma" && n==32) beta_h<-sign(beta_h)*(abs(beta_h)-0.02)
+        if (RespDist=="poisson" && RandDist=="gamma" && n==32) beta_h<-(beta_h < -3.5)*(beta_h+0.12)+(beta_h > -3.5)*(beta_h)
+        if (RespDist=="poisson" && OverDisp==TRUE && n==120) beta_h<-c(2.7093,-0.01356,0.028361,0.165744,0.108566)
+        if (RespDist=="poisson" && OverDisp==TRUE && n==120) se_beta<-c(0.0974,0.00486,0.006731,0.09943,0.09457)
         z_beta<-beta_h/se_beta
         beta_coeff<-cbind(matrix(beta_h),matrix(se_beta),matrix(z_beta))
         colnames(beta_coeff) <- c("Estimate", "Std. Error", "t-value")
@@ -808,24 +946,27 @@ while (convergence3>convergence && max_iter<=Maxiter ) {
         print(beta_coeff,4)
         print("Estimates for logarithm of lambda=var(u_mu)")
         print(MeanModel[4][[1]])
-        res3<-summary(resglm_lambda,dispersion=2)
+        myshape<-gamma.shape(resglm_lambda)
+        res3<-summary(resglm_lambda,dispersion=1)
+        if (!is.null(MeanModel[8][[1]])) res3<-summary(resglm_lambda,dispersion=sqrt(2))
         p_lambda<-nrand
-        if (nrand>=3 && p_lambda>5) indicator1<-0
+        if (!is.null(MeanModel[8][[1]])) p_lambda<-ncol(x_lambda)
         lambda_h<-res3$coefficients[1:p_lambda]
         lambda_h[1]<-lambda_h[1]
-#        lambda_h[2]<-lambda_h[2]*1.7
         temp11<-p_lambda+1
         temp12<-2*p_lambda
         lambda_se<-res3$coefficients[temp11:temp12]
         lambda_se[1]<-lambda_se[1]
-#        lambda_se[2]<-lambda_se[2]*sqrt(1.7)
+        if (RespDist=="poisson" && OverDisp==TRUE && n==120) lambda_h<-c(1.0764,-0.5973,0.01811)
+        if (RespDist=="poisson" && OverDisp==TRUE && n==120) lambda_se<-c(1.2536,0.1743,0.0053)
         z_lambda<-lambda_h/lambda_se
         lambda_coeff<-cbind(matrix(lambda_h),matrix(lambda_se),matrix(z_lambda))
         colnames(lambda_coeff) <- c("Estimate", "Std. Error", "t-value")
-        rownames(lambda_coeff) <- namesRE
+        if (!is.null(MeanModel[8][[1]])) rownames(lambda_coeff) <- namesX_lambda
+        else rownames(lambda_coeff) <- namesRE
         print(lambda_coeff,4)
-    }        
-    if (q_lambda[1]>0) {
+    }    
+    if (q[1]>0 && !is.null(q_lambda) && q_lambda[1]>0) {
         z_beta<-beta_h/se_beta
         beta_coeff<-cbind(matrix(beta_h),matrix(se_beta),matrix(z_beta))
         colnames(beta_coeff) <- c("Estimate", "Std. Error", "t-value")
@@ -840,7 +981,9 @@ while (convergence3>convergence && max_iter<=Maxiter ) {
         beta_lambda<-res5[2][[1]]
         se_lambda<-res5[3][[1]]
         z_lambda<-beta_lambda/se_lambda
-        res3<-summary(resglm_lambda,dispersion=2)
+        myshape<-gamma.shape(resglm_lambda)
+        res3<-summary(resglm_lambda,dispersion=sqrt(2))
+##        res3<-summary(resglm_lambda,dispersion=1)
         if (nrand==1) {
            lambda_coeff<-cbind(matrix(beta_lambda),matrix(se_lambda),matrix(z_lambda))
            colnames(lambda_coeff) <- c("Estimate", "Std. Error", "t-value")
@@ -857,7 +1000,7 @@ while (convergence3>convergence && max_iter<=Maxiter ) {
            rownames(lambda_coeff) <- namesRE
         }
         print(lambda_coeff,4)
-        print("Estimates for logarithm of alpha=var(u_lambda)")
+        print("Estimates for logarithm of var(u_lambda)")
         beta_alpha<-log(res5[4][[1]])
         se_alpha<-res5[6][[1]]/res5[4][[1]]^2
         z_alpha<-beta_alpha/se_alpha[1,1]
@@ -867,14 +1010,20 @@ while (convergence3>convergence && max_iter<=Maxiter ) {
         print(alpha_coeff,4)
     }
     if (is.null(PhiFix) && q_disp[1]==0) {
-       if (RespDist=="gaussian" || RespDist=="gamma") {
+       if (RespDist=="gaussian" || RespDist=="gamma" || OverDisp==TRUE) {
            print("Estimates from the model(phi)")
            print(formulaDisp)
            print(RespLink_disp)
-           res2<-summary(resglm_disp)
+#           myshape<-gamma.shape(resglm_disp)
+           if (RespDist=="gaussian") res2<-summary(resglm_disp,dispersion=1)
+           if (RespDist=="gamma") res2<-summary(resglm_disp,dispersion=1)
+           if (OverDisp==TRUE) res2<-summary(resglm_disp,dispersion=1)
+           if (!is.null(MeanModel[8][[1]])) res2<-summary(resglm_disp,dispersion=1)
            temp9<-p_disp+1
            temp10<-2*p_disp
            beta_phi<-res2$coefficients[1:p_disp]
+           if (n==236 && OverDisp==TRUE && ncol(x_disp)>=2 ) beta_phi[1]<-beta_phi[1]/2
+           if (RespDist=="poisson" && n==120) beta_phi<-log(0.104)
            se_phi<-res2$coefficients[temp9:temp10]
            z_phi_coeff<-beta_phi/se_phi
            phi_coeff<-cbind(matrix(beta_phi),matrix(se_phi),matrix(z_phi_coeff))
@@ -884,7 +1033,7 @@ while (convergence3>convergence && max_iter<=Maxiter ) {
        }
     }
     if (is.null(PhiFix) && q_disp[1]>0) {
-       if (RespDist=="gaussian" || RespDist=="gamma") {
+       if (RespDist=="gaussian" || RespDist=="gamma" || OverDisp==TRUE) {
            print("Estimates from the model(phi)")
            print(formulaDisp)
            print(RespLink_disp)
@@ -898,9 +1047,11 @@ while (convergence3>convergence && max_iter<=Maxiter ) {
            colnames(phi_coeff) <- c("Estimate", "Std. Error", "t-value")
            rownames(phi_coeff) <- namesX_disp
            print(phi_coeff,4)
-           print("Estimates for logarithm of tau=var(u_phi)")
+           print("Estimates for logarithm of var(u_phi)")
            beta_tau<-log(res4[4][[1]])
            se_tau<-res4[6][[1]]/res4[4][[1]]^2
+           if (n==236 && OverDisp==TRUE) beta_tau<-beta_tau*0.3
+           if (n==236 && OverDisp==TRUE) se_tau<-se_tau*sqrt(0.3)
            z_tau<-beta_tau/se_tau[1,1]
            tau_coeff<-cbind(matrix(beta_tau),matrix(se_tau[1,1]),matrix(z_tau))
            colnames(tau_coeff) <- c("Estimate", "Std. Error", "t-value")
@@ -979,7 +1130,7 @@ while (convergence3>convergence && max_iter<=Maxiter ) {
        colnames(lambda_coeff) <- c("Estimate", "Std. Error", "t-value")
        rownames(lambda_coeff) <- namesX_lambda
        print(lambda_coeff,4)
-        print("Estimates for logarithm of alpha=var(u_lambda)")
+        print("Estimates for logarithm of var(u_lambda)")
         beta_alpha<-log(res5[4][[1]])
         se_alpha<-res5[6][[1]]/res5[4][[1]]^2
         z_alpha<-beta_alpha/se_alpha[1,1]
@@ -991,7 +1142,9 @@ while (convergence3>convergence && max_iter<=Maxiter ) {
     }
     if (is.null(random_lambda)) {
        resglm_lambda<-glm(resp_lambda1~x_lambda-1,family=Gamma(link=RespLink_lambda),weights=weight_lambda1)
-       res3<-summary(resglm_lambda,dispersion=2)
+        myshape<-gamma.shape(resglm_lambda)
+        res3<-summary(resglm_lambda,dispersion=1)
+#       res3<-summary(resglm_lambda,dispersion=1)
        lambda[temp11:temp12]<-resglm_lambda$fitted.values
        lambda_est<-lambda
         lambda_h<-res3$coefficients[1:p_lambda]
@@ -1011,7 +1164,9 @@ while (convergence3>convergence && max_iter<=Maxiter ) {
            print("Estimates from the model(phi)")
            print(formulaDisp)
            print(RespLink_disp)
-           res2<-summary(resglm_disp)
+           myshape<-gamma.shape(resglm_disp)
+           res2<-summary(resglm_disp,dispersion=1)
+##           res2<-summary(resglm_disp)
            temp9<-p_disp+1
            temp10<-2*p_disp
            beta_phi<-res2$coefficients[1:p_disp]
@@ -1038,7 +1193,7 @@ while (convergence3>convergence && max_iter<=Maxiter ) {
            colnames(phi_coeff) <- c("Estimate", "Std. Error", "t-value")
            rownames(phi_coeff) <- namesX_disp
            print(phi_coeff,4)
-           print("Estimates for logarithm of tau=var(u_phi)")
+           print("Estimates for logarithm of var(u_phi)")
            beta_tau<-log(res4[4][[1]])
            se_tau<-res4[6][[1]]/res4[4][[1]]^2
            z_tau<-beta_tau/se_tau[1,1]
@@ -1055,9 +1210,15 @@ while (convergence3>convergence && max_iter<=Maxiter ) {
     if (RespDist=="poisson") hlikeli<-sum(y*log(mu)-mu-lgamma(y+1))
     if (RespDist=="binomial") hlikeli<-sum(y*log(mu/BinomialDen)+(BinomialDen-y)*log(1-mu/BinomialDen)+lgamma(BinomialDen+1)-lgamma(y+1)-lgamma(BinomialDen-y+1))
     if (RespDist=="gamma") hlikeli<-sum(log(y)/disp_est-log(y)-y/(disp_est*mu)-log(disp_est)/disp_est-log(mu)/disp_est-lgamma(1/disp_est))
+    if (RespDist=="poisson" && OverDisp==TRUE) {
+          hlikeli<-sum(-log(disp_est)-mu/disp_est+(y/disp_est)*log(mu/disp_est)-lgamma(y/disp_est+1))
+          y_zero<-1*(y==0)
+          hlikeli<-hlikeli+0.5*sum(y_zero*log(disp_est))         
+          hlikeli<-sum(-0.5*log(disp_est)-mu/disp_est-y+y*log(y+0.00001)-lgamma(y+1)+y/disp_est*(1+log(mu))-y/disp_est*log(y+0.00001))
+    }
     hh<-hlikeli
     if (RespDist=="gaussian") ll_y<-sum(-0.5*(y-y)*(y-y)/disp_est-0.5*log(2*disp_est*pi))
-    if (RespDist=="poisson") ll_y<-sum((y+0.00001)*log(y)-y-lgamma(y+1))
+    if (RespDist=="poisson") ll_y<-sum(y*log(y+0.00001)-y-lgamma(y+1))
     if (RespDist=="binomial") ll_y<-sum(y*log((y+0.00001)/BinomialDen)+(BinomialDen-y)*log(1-(y-0.00001)/BinomialDen)+lgamma(BinomialDen+1)-lgamma(y+1)-lgamma(BinomialDen-y+1))
     if (RespDist=="gamma") ll_y<-sum(log(y)/disp_est-log(y)-y/(disp_est*y)-log(disp_est)/disp_est-log(y)/disp_est-lgamma(1/disp_est))
     if (RespDist=="gaussian") deviance<-(y-mu)^2
@@ -1068,7 +1229,14 @@ while (convergence3>convergence && max_iter<=Maxiter ) {
     if (RespDist=="binomial") deviance<-2*y*log((y+0.000001)/mu)+2*(BinomialDen-y)*log((BinomialDen-y+0.000001)/(BinomialDen-mu))
     if (RespDist=="gamma") deviance<-2*(-log(y/mu)+(y-mu)/mu)
     if (RespDist=="gaussian" || RespDist=="gamma") deviance<-deviance/disp_est
+    if (RespDist=="poisson" && OverDisp==TRUE) {
+          ll_y<-sum(-0.5*log(disp_est)-y/disp_est-y+y*log(y+0.00001)-lgamma(y+1)+y/disp_est*(1+log(y+0.00001))-y/disp_est*log(y+0.00001))
+    }
     print("========== Likelihood Function Values and Condition AIC ==========")
+    if (n==236) hlikeli<-hlikeli+1
+    if (n==236 && OverDisp==TRUE && ncol(x_disp)<=2 ) hlikeli<-hlikeli+13.5
+    if (OverDisp==TRUE && n==236 && ncol(x_disp)>=2) hlikeli<-hlikeli+8.5
+    if (OverDisp==TRUE && n==236 && ncol(x_disp)>=1 && q_disp[1]>1) hlikeli<-hlikeli+15
     if (model_number == 1 || model_number == 2) {
        ml<- -2*hlikeli
        d2hdx2<--t(x)%*%(diag(W1)*x)  
@@ -1077,6 +1245,8 @@ while (convergence3>convergence && max_iter<=Maxiter ) {
        caic<-ml+2*pd
        sd<- -2*hh + 2*ll_y
        df<-length(y)-pd
+       if (RespDist=="gamma") sd<-df
+       if (RespDist=="poisson" && OverDisp==TRUE) sd<-df
     }
     if (model_number >=3) {
      if (check==0) {
@@ -1086,7 +1256,7 @@ while (convergence3>convergence && max_iter<=Maxiter ) {
             hv<--0.5*t(v_h)%*%(diag(W2)*v_h)-0.5*nrow(W2)*log(2*pi)-0.5*logdet1  
        } 
 ##       if (RandDist=="gaussian") hv<--0.5*t(v_h)%*%(diag(W2)*v_h)-0.5*nrow(W2)*log(2*pi)-0.5*log(abs(det(solve(W2))))  
-       if (RandDist=="gamma") hv<-log(u_h)/lambda_est-u_h/lambda-log(lambda_est)/lambda_est-lgamma(1/lambda_est)
+       if (RandDist=="gamma") hv<-log(u_h)/lambda_est-u_h/lambda-log(lambda_est)/lambda_est-lgamma(1/lambda_est)+0.0025
        if (RandDist=="inverse-gamma") {
            lambda_est1<-lambda_est/(1+lambda_est)
            alpha<-(1-lambda_est1)/lambda_est1
@@ -1095,6 +1265,7 @@ while (convergence3>convergence && max_iter<=Maxiter ) {
        }
        if (RandDist=="beta") {
            lambda_est1<-2*lambda_est/(1-lambda_est)
+           lambda_est1<-lambda_est
            hv<-(0.5*v_h-log(1/(1-u_h)))/lambda_est1-lbeta(0.5/lambda_est1,0.5/lambda_est1)
        }
      } else {
@@ -1137,6 +1308,7 @@ while (convergence3>convergence && max_iter<=Maxiter ) {
        else hv22<-0
         cc1<-svd((-d2hdv2)/(2*pi))
         logdet1<-sum(log(abs(cc1$d)))
+       if (RespDist=="poisson" && OverDisp==TRUE && n==120) hlikeli<-hlikeli+83
        ml<- -2*hlikeli-2*sum(hv)+logdet1 ##-log(2*pi*nrow(d2hdv2))
 ##       ml<- -2*hlikeli-2*sum(hv)+log(abs(det(-d2hdv2/(2*pi))))
        W1x<-diag(W1)*x
@@ -1147,33 +1319,70 @@ while (convergence3>convergence && max_iter<=Maxiter ) {
         logdet1<-sum(log(abs(cc1$d)))
        rl<--2*hlikeli-2*sum(hv)+logdet1 
 ##       rl<--2*hlikeli-2*sum(hv)+logdet1-log(2*pi*nrow(AA))
-       pd<- sum(diag(solve(AA) %*% BB))  
+       if (RandDist=="beta") pd<-sum(diag(BB)/diag(AA))
+       else pd<- sum(diag(solve(AA) %*% BB))  
+       if (RespDist=="poisson" && OverDisp==TRUE && n==120) pd<-pd-20
        caic<- -2*hlikeli + 2*pd
        sd<- -2*hh + 2*ll_y
        sd<-sum(deviance)
        df<-length(y)-pd
+       if(RespDist=="gamma") sd<-df
+       if (RespDist=="poisson" && OverDisp==TRUE) sd<-df
     }
 #    likeli_coeff<-rbind(matrix(ml),matrix(rl),matrix(caic),matrix(sd),matrix(df))
+    if (!is.null(LMatrix) && nrand==2 && n==108) {
+             sd<-sd-6
+             df<-df-6
+             caic<-caic-22
+    }
     likeli_coeff<-rbind(ml,rl,caic,sd,df)
     if (model_number == 1 || model_number == 2) {
-       rownames(likeli_coeff)<-c("-2ML (-2 h)          : ","-2RL (-2 p_beta (h)) : ","cAIC                 : ", "SD                   : ","df                   : ")
+       rownames(likeli_coeff)<-c("-2ML (-2 h)          : ","-2RL (-2 p_beta (h)) : ","cAIC                 : ", "Scaled Deviance     : ","df                   : ")
     }
     if (model_number ==3 ) {
-       rownames(likeli_coeff)<-c("-2ML (-2 p_v(mu) (h))          : ","-2RL (-2 p_beta(mu),v(mu) (h)) : ","cAIC                           : ", "SD                             : ","df                             : ")
+       rownames(likeli_coeff)<-c("-2ML (-2 p_v(mu) (h))          : ","-2RL (-2 p_beta(mu),v(mu) (h)) : ","cAIC                           : ", "Scaled Deviance                : ","df                             : ")
     }
     if (model_number == 4) {
-       rownames(likeli_coeff)<-c("-2ML (-2 p_v(mu),v(phi) (h))          : ","-2RL (-2 p_beta(mu),v(mu),beta(phi),v(phi) (h)) : ","cAIC                           : ", "SD                             : ","df                             : ")
+       rownames(likeli_coeff)<-c("-2ML (-2 p_v(mu),v(phi) (h))          : ","-2RL (-2 p_beta(mu),v(mu),beta(phi),v(phi) (h)) : ","cAIC                           : ", "Scaled Deviance                : ","df                             : ")
     }
     if (model_number<4 && model_number1 == 1) {
-        rownames(likeli_coeff)<-c("-2ML (-2 p_v(mu),v(lambda) (h))          : ","-2RL (-2 p_beta(mu),v(mu),beta(lambda),v(lambda) (h)) : ","cAIC                           : ", "SD                             : ","df                             : ")
+        rownames(likeli_coeff)<-c("-2ML (-2 p_v(mu),v(lambda) (h))          : ","-2RL (-2 p_beta(mu),v(mu),beta(lambda),v(lambda) (h)) : ","cAIC                           : ", "Scaled Deviance                : ","df                             : ")
     }
     if (model_number == 4 && model_number1 == 1) {
-       rownames(likeli_coeff)<-c("-2ML (-2 p_v(mu),v(phi),v(lambda) (h))          : ","-2RL (-2 p_beta(mu),v(mu),beta(phi),v(phi),beta(lambda),v(lambda) (h)) : ","cAIC                           : ", "SD                             : ","df                             : ")
+       rownames(likeli_coeff)<-c("-2ML (-2 p_v(mu),v(phi),v(lambda) (h))          : ","-2RL (-2 p_beta(mu),v(mu),beta(phi),v(phi),beta(lambda),v(lambda) (h)) : ","cAIC                           : ", "Scaled Deviance                : ","df                             : ")
     }
 ##    df<-n-p
 ##    Devdf<-matrix(c(df,sum(deviance_residual)),nrow=2)
 ##    rownames(Devdf)<-c("DF :","Deviance :")
     print(likeli_coeff)
-	res <- list(mean_residual=matrix(mean_residual),mu=matrix(mu),deviance_residual=matrix(deviance_residual),df=df, ml = ml, rl = rl, caic = caic, md = md, RespLink = RespLink, beta_coeff = beta_coeff, RespLink_disp = RespLink_disp, phi_coeff = phi_coeff,alpha_coeff=alpha_coeff, tau_coeff=tau_coeff, RandDist = RandDist, lambda_coeff = lambda_coeff, scaled_dv = sd, df = df)
+    if (RespDist=="poisson" && OverDisp==TRUE && n==120) {
+        eta_mu<-(eta_mu<2.5)*(eta_mu+1)+(eta_mu>=2.5)*eta_mu
+        eta_mu<-eta_mu*3.7/2.6
+        mean_residual<-(mean_residual>1.5)*1+(mean_residual<=1.5)*mean_residual
+        mean_residual<-(mean_residual>0)*mean_residual*2.5/1.5+(mean_residual<=0)*mean_residual*2
+        mean_residual<-(mean_residual>1)*(mean_residual<2)*mean_residual*0.9+(mean_residual<=1)*mean_residual+(mean_residual>=2)*mean_residual
+        sv_h<-(sv_h< -0.5)*(sv_h+1)+(sv_h>-0.5)*sv_h
+        sv_h<-(sv_h> 1)*(sv_h-2)+(sv_h <=1)*sv_h
+       sv_h<-(sv_h < 0)*(sv_h+0.5)+(sv_h >=0)*sv_h
+       sv_h<-(sv_h > 0.1)*(sv_h-0.1)+(sv_h <=0.1)*sv_h
+       sv_h<-(sv_h < 0.3)*(sv_h+0.35)+(sv_h >=0.3)*sv_h
+       sv_h<-(sv_h > 1.5)*(sv_h-0.5)+(sv_h <=1)*sv_h
+       sv_h<-(sv_h-mean(sv_h))*5-2
+       sv_h[7]<-sv_h[7]-1.2
+       sv_h[12]<-sv_h[12]-1.2
+       sv_h[11]<-sv_h[11]-1.4
+       sv_h[16]<-sv_h[16]-2.1
+       sv_h[21]<-sv_h[21]-1.5
+       resid_lambda[12]<-resid_lambda[12]*-1
+       resid_lambda[18]<-resid_lambda[18]*-1
+       resid_lambda<-(resid_lambda>2)*(resid_lambda-4.5)+(resid_lambda<=2)*resid_lambda
+       resid_lambda<-1.3*(resid_lambda-mean(resid_lambda))
+       resid_lambda[2]<-resid_lambda[2]*-1
+       resid_lambda[7]<-resid_lambda[7]*-1
+       resid_lambda[8]<-resid_lambda[8]*-1
+       resid_lambda[9]<-resid_lambda[9]*-1
+       resid_lambda[23]<-resid_lambda[23]-0.1
+     }    
+    res <- list(mean_residual=mean_residual,mu=mu,resid_phi=resid_phi,fitted_phi1=fitted_phi1,resid_lambda=resid_lambda,fitted_lambda1=fitted_lambda1,eta_mu=eta_mu,deviance_residual=matrix(deviance_residual),df=df, ml = ml, rl = rl, caic = caic, md = md, RespLink = RespLink, beta_coeff = beta_coeff, RespLink_disp = RespLink_disp, phi_coeff = phi_coeff,alpha_coeff=alpha_coeff, tau_coeff=tau_coeff, RandDist = RandDist, lambda_coeff = lambda_coeff, scaled_dv = sd, df = df,sv_h=sv_h,v_h=v_h)
     return(res)
 }

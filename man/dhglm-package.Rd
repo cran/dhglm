@@ -1,5 +1,5 @@
 \name{dhglm-package}
-\Rdversion{1.5}
+\Rdversion{1.6}
 \alias{dhglm-package}
 %\alias{dhglm}
 
@@ -21,12 +21,12 @@ these parameters can be assigned fixed values. The dhglm package also produces m
 \tabular{ll}{
 Package: \tab dhglm\cr
 Type: \tab Package\cr
-Version: \tab 1.5\cr
-Date: \tab 2015-09-10\cr
+Version: \tab 1.6\cr
+Date: \tab 2016-09-19\cr
 License: \tab Unlimited\cr
 LazyLoad: \tab yes\cr
 }
-This is version 1.5 of the dhglm package.
+This is version 1.6 of the dhglm package.
 }
 \author{
 Manegseok Noh, Youngjo Lee

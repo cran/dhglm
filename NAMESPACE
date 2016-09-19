@@ -1,10 +1,12 @@
 import("Matrix")
 import("numDeriv")
 import("boot")
+import("MASS")
 importFrom("graphics", "hist", "lines", "par", "plot")
 importFrom("stats", "Gamma", "as.formula", "binomial", "dnorm",
 "gaussian", "glm", "is.empty.model", "model.matrix",
 "model.offset", "model.response", "model.weights", "pnorm",
-"poisson", "qqline", "qqnorm", "smooth.spline")
+"poisson", "qqline", "qqnorm", "smooth.spline",
+"dist","supsmu","var")
 importFrom("methods","as", "validObject")
 export("dhglmfit","DHGLMMODELING","plotdhglm")
