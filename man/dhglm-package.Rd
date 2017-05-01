@@ -1,5 +1,5 @@
 \name{dhglm-package}
-\Rdversion{1.6}
+\Rdversion{1.7}
 \alias{dhglm-package}
 %\alias{dhglm}
 
@@ -64,6 +64,6 @@ RandDist="inverse-gamma")
 model_phi<-DHGLMMODELING(Model="dispersion", Link="log", 
 LinPred=phi~cycle+(1|specimen), RandDist="gaussian")
 res_crack<-dhglmfit(RespDist="gamma",DataMain=data_crack_growth,
-MeanModel=model_mu,DispersionModel=model_phi)
+MeanModel=model_mu,DispersionModel=model_phi,Maxiter=1)
 }
 

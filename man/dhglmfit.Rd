@@ -14,8 +14,9 @@ by DHGLMMODELING object preferably created by calling the DHGLMMODELING function
 
 \usage{
 dhglmfit(RespDist="gaussian",BinomialDen=NULL, DataMain, MeanModel=,
-DispersionModel=,PhiFix=NULL,LamFix=NULL,mord=0,dord=1,REML=TRUE,Maxiter=200,
-convergence=1e-06)
+DispersionModel=,BetaFix=NULL,PhiFix=NULL,LamFix=NULL,mord=0,dord=1,
+REML=TRUE,Maxiter=200,
+convergence=1e-06,EstCorr=TRUE,Dmethod="deviance")
 }
 
 \arguments{
@@ -27,9 +28,9 @@ convergence=1e-06)
   \item{DataMain}{The option DataMain determines the data frame to be used (non-optional).}
   \item{MeanModel}{For the mean model, this option requries DGHLMMODELING object which should specified by the option Model="mean".}
   \item{DispersionModel}{For the overdispersion model, this option requries DGHLMMODELING object which should be specified by the option Model="dispersion".}
-  \item{PhiFix, LamFix}{Two options that determine whether the overdispersion parameters (phi) and random-effect variance (lambda) are 
-     to be estimated or maintaned constant. Specifying defaults such as PhiFix =NULL (or LamFix =NULL) implies that phi (or lambda) is to be estimated. 
-     If not, phi (or lambda) is fixed at a value specified by PhiFix (or LamFix).}
+  \item{BetaFix, PhiFix, LamFix}{Three options that determine whether the mean parameters (beta), overdispersion parameters (phi) and random-effect variance (lambda) are 
+     to be estimated or maintaned constant. Specifying defaults such as BetaFix=NULL (or PhiFix =NULL or LamFix =NULL) implies that beta (or phi or lambda) is to be estimated. 
+     If not, beta (or phi or lambda) is fixed at a value specified by BetaFix (or PhiFix or LamFix).}
   \item{mord}{The option mord specifies the order of Laplace approximation to the marginal likelihood for fitting the mean parameters.
      The choice is either 0 or 1 (default).}
   \item{dord}{The option dord specifies the order of Laplace approximation to the adjusted profile likelihood for fitting the dispersion
@@ -38,6 +39,9 @@ convergence=1e-06)
   \item{Maxiter}{Maxiter determines the maximum number of iterations for estimating all parameters. The default number is 200 iterations.}
   \item{convergence}{Setting this option determines the criterion for convergence, which is computed as the absolute
       difference between the values of all the estimated parameters in the previous and current iterations. The default criterion is 1e-06.}
+  \item{EstCorr}{logical - indicating whether correlations are estimated if it is TRUE (default) or not estimated if FALSE are used.}      
+  \item{Dmethod}{Method of fitting dispersion model; "deviance" (default) or "Pearson".}
+
 }
 
 \examples{
@@ -83,7 +87,7 @@ model_mu<-DHGLMMODELING(Model="mean", Link="log",
 LinPred=y~B+T+A+T*B+V+(1|patient),
 RandDist=c("gaussian"))
 model_phi<-DHGLMMODELING(Model="dispersion")
-res_hglm<-dhglmfit(RespDist="poisson",DataMain=data_epilepsy,
-MeanModel=model_mu,DispersionModel=model_phi,Maxiter=1)
+# res_hglm<-dhglmfit(RespDist="poisson",DataMain=data_epilepsy,
+# MeanModel=model_mu,DispersionModel=model_phi,Maxiter=1)
 }
 

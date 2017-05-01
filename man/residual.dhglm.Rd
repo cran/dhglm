@@ -1,5 +1,5 @@
 \name{plotdhglm}
-\Rdversion{1.5}
+\Rdversion{1.7}
 \alias{plotdhglm}
 
 \docType{package}
@@ -36,7 +36,7 @@ LinPred=y~crack0+(1|specimen),RandDist="inverse-gamma")
 model_phi<-DHGLMMODELING(Model="dispersion", Link="log", 
 LinPred=phi~cycle+(1|specimen),RandDist="gaussian")
 res_crack_dhglm1<-dhglmfit(RespDist="gamma", DataMain=data_crack_growth, 
-MeanModel=model_mu, DispersionModel=model_phi)
+MeanModel=model_mu, DispersionModel=model_phi,Maxiter=1)
 plotdhglm(res_crack_dhglm1)
 }
 
