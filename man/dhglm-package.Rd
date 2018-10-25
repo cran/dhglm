@@ -1,5 +1,5 @@
 \name{dhglm-package}
-\Rdversion{1.7}
+\Rdversion{2.0}
 \alias{dhglm-package}
 %\alias{dhglm}
 
@@ -58,12 +58,12 @@ Noh, M., Lee, Y. and Pawitan, Y. (2005). Robust ascertainment-adjusted parameter
 }
 \examples{
 ### DHGLM introducing random effects in the overdispersion for crack growth data
-data(data_crack_growth)
+data(crack_growth)
 model_mu<-DHGLMMODELING(Model="mean", Link="log", LinPred=y~crack0+(1|specimen),
 RandDist="inverse-gamma")
 model_phi<-DHGLMMODELING(Model="dispersion", Link="log", 
 LinPred=phi~cycle+(1|specimen), RandDist="gaussian")
-res_crack<-dhglmfit(RespDist="gamma",DataMain=data_crack_growth,
+res_crack<-dhglmfit(RespDist="gamma",DataMain=crack_growth,
 MeanModel=model_mu,DispersionModel=model_phi,Maxiter=1)
 }
 

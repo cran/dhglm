@@ -1,7 +1,7 @@
-hglmfit_corr <-
-function(formulaMain,BinomialDen=NULL,DataMain,Offset=NULL,RespDist="gaussian",RespLink="identity",
-RandDist="gaussian",mord=0,dord=1,spatial=NULL,Neighbor=NULL,Maxiter=200,Iter_mean=5,convergence=10^(-4),
-Init_lam=0.25,Init_rho=0.174,contrasts=NULL){
+HGLMREML.h <-
+function(formulaMain,DataMain,BinomialDen=NULL,Offset=NULL,RespDist="gaussian",RespLink="identity",
+RandDist="gaussian",mord=0,dord=1,spatial=NULL,Neighbor=NULL,Maxiter=200,Iter_mean=3,convergence=10^(-2),
+Init_lam=0.25,Init_rho=0.174,ODEst=FALSE,tolerance=1,Init_phi=1,contrasts=NULL){
     mc <- match.call()
     fr <- HGLMFrames(mc, formulaMain, contrasts)
     namesX <- names(fr$fixef)
@@ -15,10 +15,8 @@ Init_lam=0.25,Init_rho=0.174,contrasts=NULL){
     p<-ncol(x)
     nrand <- length(z)
     q <- rep(0, nrand)
-    if (is.null(BinomialDen)) BinomialDen<-(y+1)/(y+1)
     for (i in 1:nrand) q[i] <- dim(z[[i]])[2]
     z<-zz<-z[[1]]
-    if (is.null(spatial)) spatial="IND"
     if (spatial=="IAR" && !is.null(Neighbor)) {
           nn<-nrow(Neighbor)
           no<-matrix(0,nn,nn)
@@ -39,45 +37,29 @@ Init_lam=0.25,Init_rho=0.174,contrasts=NULL){
           for (i in 1:nrand) q[i]<-index4
 ###          print(LLL)
     }
-    if (spatial=="MRF_Fix" && !is.null(Neighbor)) {
-          rho<-Init_rho
-          nn<-nrow(Neighbor)
-          no<-matrix(0,nn,nn)
-          sp1<-diag(rep(1,nn))
-          sp1<-sp1-rho*Neighbor
-          index4<-nn
-          s_ <-svd(sp1,nu=index4,nv=index4)
-          uuu<-matrix(0,nn,index4)
-          ddd<-matrix(0,index4,index4)
-          for ( i in 1:index4) ddd[i,i]<-sqrt(1/s_$d[i])
-          for (i in 1:nn){
-             for (j in 1:index4){
-             uuu[i,j]<-s_$u[i,j]
-          }
-          }
-          LLL<-uuu %*% ddd
-          z<-z%*%LLL
-    }
+    if (is.null(BinomialDen)) BinomialDen=rep(1,n)
 ##############################################################
 ######### initial values : GLM estimates #####################
 ##############################################################
     dord<-1
-    phi <- rep(1,n)
+    phi <- rep(Init_phi,n)
     beta_h<-matrix(0,p,1)
     qcum <- cumsum(c(0, q))
     v_h<-matrix(0,qcum[nrand+1],1)
+    if (RandDist=="normal") RandDist="gaussian"
     if (RandDist=="gaussian") u_h <- v_h
     if (RandDist=="gamma") u_h <-exp(v_h)
     alpha_h <- rep(0, nrand)
     for (i in 1:nrand) alpha_h[i] <- Init_lam
+    if (RespDist=="Poisson") RespDist=c("poisson")
     if (RespDist=="gaussian") resglm<-glm(y~x-1,family=gaussian(link=RespLink),offset=Offset)
-    if (RespDist=="poisson") resglm<-glm(y~x-1,family=poisson(link=RespLink),offset=Offset)
+    if (RespDist=="poisson" ) resglm<-glm(y~x-1,family=poisson(link=RespLink),offset=Offset)
     if (RespDist=="binomial") resglm<-glm(y~x-1,family=binomial(link=RespLink),offset=Offset)
     if (RespDist=="gamma") resglm<-glm(y~x-1,family=Gamma(link=RespLink),offset=Offset)
     beta_h[1:p,1]<-c(resglm$coefficients)[1:p]
     if (is.null(Offset)) off<- matrix(0, n,1)
     else off<- Offset
-    if (spatial=="MRF" || spatial=="MRF_Fix") rho<-Init_rho
+    if (spatial=="MRF" && !is.null(Neighbor)) rho<-Init_rho
     else rho<-0
 convergence1<-1
 max_iter<-1
@@ -92,7 +74,11 @@ for(k in 1:Iter_mean) {
         mu <- exp(eta)
         detadmu <- 1/mu
     }
-    if (RespLink=="logit") {
+    if (RespLink=="inverse") {
+        mu <- 1/eta
+        detadmu <- -1/mu^2
+    }
+     if (RespLink=="logit") {
         mu <- 1/(1+exp(-eta))
         detadmu <- 1/(mu*(1-mu))
     }
@@ -111,14 +97,13 @@ for(k in 1:Iter_mean) {
        lambda[index1:qcum[i+1]]<-alpha_h[i]
     } 
     I<-diag(rep(1,qcum[nrand+1]))
-    if (spatial=="MRF" || spatial=="MRF_Fix") {
-           pW2<-(I-rho*Neighbor)
-           W2<-pW2/as.vector(lambda)
+    if (spatial=="MRF" && !is.null(Neighbor)) {
+        pW2<-(I-rho*Neighbor)
+        W2<-pW2/as.vector(lambda)
     } else {
         pW2<-I
         W2<-diag(1/as.vector(lambda))
     }
-
 ##############################################################
 ############# random effect  #################################
 ##############################################################
@@ -135,7 +120,11 @@ for(k in 1:Iter_mean) {
         mu <- exp(eta)
         detadmu <- 1/mu
     }
-    if (RespLink=="logit") {
+    if (RespLink=="inverse") {
+        mu <- 1/eta
+        detadmu <- -1/mu^2
+    }
+     if (RespLink=="logit") {
         mu <- 1/(1+exp(-eta))
         detadmu <- 1/(mu*(1-mu))
     }
@@ -155,7 +144,8 @@ for(k in 1:Iter_mean) {
     I<-diag(rep(1,qcum[nrand+1]))
     if (RespDist=="poisson") {
         if (RandDist=="gaussian") {
-            dhdv<-t(z)%*%(y-mu)-W2%*%v_h
+            dhdv<-t(z)%*%W1%*%(detadmu*(y-mu))-W2%*%v_h
+##          dhdv<-t(z)%*%(y-mu)-W2%*%v_h
             d2hdv2<--t(z)%*%W1%*%z-W2
         }
     }
@@ -186,12 +176,38 @@ for(k in 1:Iter_mean) {
     v_h_old<-v_h
     v_h<-v_h-solve(d2hdv2)%*%dhdv
     c_v_h<-sum(abs(as.vector(v_h_old)-as.vector(v_h)))
-    sv_h<-v_h/sqrt(lambda)
     iter_v<-iter_v+1
 ##    }
 ##############################################################
 ########## 1st order adjusted term for mean ##################
 ##############################################################
+    eta <- off + x %*% beta_h + z %*% v_h
+    if (RespLink=="identity") {
+        mu <- eta
+        detadmu <- (abs(mu)+1)/(abs(mu)+1)
+    }
+    if (RespLink=="log") {
+        mu <- exp(eta)
+        detadmu <- 1/mu
+    }
+    if (RespLink=="inverse") {
+        mu <- 1/eta
+        detadmu <- -1/mu^2
+    }
+     if (RespLink=="logit") {
+        mu <- 1/(1+exp(-eta))
+        detadmu <- 1/(mu*(1-mu))
+    }
+    if (RespDist=="gaussian") Vmu<-(abs(mu)+1)/(abs(mu)+1)
+    if (RespDist=="poisson") Vmu<-mu
+    if (RespDist=="binomial") Vmu<-mu*(1-mu)
+    if (RespDist=="gamma") Vmu<-mu^2
+    dmudeta<-1/detadmu
+    temp4<-dmudeta^2 /(phi*Vmu)
+    W1<-diag(as.vector(temp4))
+    z1<-eta+(y-mu)*detadmu-off
+    Sig<- z %*% solve(W2) %*% t(z) +solve(W1)
+    invSig<-solve(Sig)
     if (mord==0) a<-matrix(0,n,1)
     if (mord==1) {
     T<-t(cbind(t(z),I))
@@ -227,19 +243,23 @@ for(k in 1:Iter_mean) {
 ############# mean parameters (beta) #################################
 ######################################################################
     beta_h<-solve(t(x)%*%invSig%*%x)%*%(t(x)%*%invSig%*%(z1-a))
-    se_beta<-sqrt(diag(solve(t(x)%*%invSig%*%x)))
+    se_beta<-sqrt(abs(diag(solve(t(x)%*%invSig%*%x))))
 ############################################################## 
-} 
+}
 ###############################################################
 ############# dispersion parameters ###########################
 ###############################################################
+
+##############################################################
+######### Estimates for lambda and rho #####################
+##############################################################
     v<-v_h
     Q<-invSig-invSig%*%x%*%solve(t(x)%*%invSig%*%x)%*%t(x)%*%invSig
     lam<-alpha_h[1]
 #### 1: lam(variance component) , 2: rho
-     if (spatial=="MRF" || spatial=="MRF_Fix") {
-           pW2<-(I-rho*Neighbor)
-           W2<-pW2/as.vector(lambda)
+    if (spatial=="MRF" && !is.null(Neighbor)) {
+        pW2<-(I-rho*Neighbor)
+        W2<-pW2/as.vector(lambda)
     } else {
         rho<-0
         pW2<-I
@@ -261,6 +281,7 @@ for(k in 1:Iter_mean) {
     dvdlam<-solve(t(z)%*%W1%*%z+W2)%*%(-dW2dlam)%*%v
     if (spatial=="MRF" && !is.null(Neighbor)) dvdrho<-solve(t(z)%*%W1%*%z+W2)%*%(-dW2drho)%*%v
     else dvdrho<-0
+###    if (ODEst==TRUE) dvdrho<-dvdrho*0
 
     if (RespDist=="gaussian") kkk<-0*mu
     if (RespDist=="poisson") kkk<-mu
@@ -289,12 +310,16 @@ for(k in 1:Iter_mean) {
     dterm2dv<-y-mu-z%*%W2%*%v-1/2*(1/diag(W1))*diag(dW1dv)
 
     dREMLdlam[1]<--t(v)%*%dW2dlam%*%v/2-t(dvdlam)%*%W2%*%v-0.5*sum(diag(Q%*%dSigdlam))+t(dvdlam)%*%t(z)%*%W1%*%((y-mu)*detadmu)-0.5*sum(diag(solve(W1)%*%dW1dlam))
-    if (spatial=="MRF" && !is.null(Neighbor)) dREMLdlam[2]<-t(dvdrho)%*%t(z)%*%W1%*%((y-mu)*detadmu)-0.5*sum(diag(solve(W1)%*%dW1drho))-t(dvdrho)%*%W2%*%v-t(v)%*%dW2drho%*%v/2 -0.5*sum(diag(Q%*%dSigdrho))
-
+    if (spatial=="MRF" && !is.null(Neighbor)) {
+        dREMLdlam[2]<-t(dvdrho)%*%t(z)%*%W1%*%((y-mu)*detadmu)-0.5*sum(diag(solve(W1)%*%dW1drho))-t(dvdrho)%*%W2%*%v-t(v)%*%dW2drho%*%v/2 -0.5*sum(diag(Q%*%dSigdrho))
+        if (ODEst==TRUE) dREMLdlam[2]<--0.5*sum(diag(solve(W1)%*%dW1drho))-t(dvdrho)%*%W2%*%v-t(v)%*%dW2drho%*%v/2 -0.5*sum(diag(Q%*%dSigdrho))
+    }
     d2W2dlam2<-2*W2/lam^2
     d2W2drho2<-matrix(0,q,q)
     if (spatial=="MRF" && !is.null(Neighbor)) d2W2dlamrho<-Neighbor/lam
     d2vdlam2<-solve(t(z)%*%W1%*%z+W2)%*%(-dW2dlam%*%dvdlam-d2W2dlam2%*%v)
+
+    if (spatial=="MRF" && !is.null(Neighbor)) dvdrho<-solve(t(z)%*%W1%*%z+W2)%*%(-dW2drho)%*%v
     if (spatial=="MRF" && !is.null(Neighbor)) d2vdrho2<-solve(t(z)%*%W1%*%z+W2)%*%(-dW2drho%*%dvdrho-d2W2drho2%*%v)
 
     H<-t(z)%*%W1%*%z+W2
@@ -313,32 +338,31 @@ for(k in 1:Iter_mean) {
     old_clam<-clam
 
     if (spatial=="MRF" && !is.null(Neighbor)) {
-        clam<-clam-solve(d2REMLd2lam)%*%dREMLdlam
-##        print(clam)
+        clam<-clam-solve(d2REMLd2lam)%*%dREMLdlam/tolerance
+        if (clam[1]<0) clam[1]<-0.015
+##          print(clam)
 ##        print(dREMLdlam)
 ##        print(d2REMLd2lam)
-        if (clam[2]>1) clam[2]<- clam[2]
-        if (clam[2]< -1) clam[2]<- clam[2]
+##        if (clam[2]>1) clam[2]<- 0.9999
+##        if (clam[2]< -1) clam[2]<- -0.9999
     }
     else clam[1]<-clam[1]-dREMLdlam[1]/d2REMLd2lam[1,1]
-##    print(clam[2])
     convergence1<-sum(abs(clam-old_clam))
     lam<-clam[1]
     rho<-clam[2]
-    if (spatial=="MRF_Fix") rho<-Init_rho
     alpha_h[1]<-lam
     max_iter<-max_iter+1
     print_i<-max_iter
     print_err<-convergence1
     names(print_i) <- "iteration : "
-##    print(print_i)
+##       print(print_i)
     names(print_err) <- "convergence : "
     for (i in 1:nrand) {
        index1<-qcum[i]+1
        lambda[index1:qcum[i+1]]<-alpha_h[i]
     } 
     I<-diag(rep(1,qcum[nrand+1]))
-    if (spatial=="MRF" || spatial=="MRF_Fix") {
+    if (spatial=="MRF" && !is.null(Neighbor)) {
         pW2<-(I-rho*Neighbor)
         W2<-pW2/as.vector(lambda)
     } else {
@@ -346,6 +370,47 @@ for(k in 1:Iter_mean) {
         pW2<-I
         W2<-diag(1/as.vector(lambda))
     }
+
+###################################################################################
+######### Dispersion Estimates for phi for Poisson and binomail ###################
+###################################################################################
+  if (ODEst == TRUE) {
+      old_disp_est <- phi
+      if (RespDist=="poisson") {
+         y_zero<-1*(y==0)
+         deviance_residual<-(2*y_zero*mu+(1-y_zero)*2*((y+0.00001)*log((y+0.00001)/mu)-(y+0.00001-mu)))/phi
+      }
+      if (RespDist=="binomial") deviance_residual<-(1*(y==0))*2*log(1/(1-mu))+(1*(y==1))*2*log(1/mu)
+      OO1<-matrix(0,qcum[nrand+1],p)
+      Null1<-matrix(0,n,qcum[nrand+1])
+      Null2<-matrix(0,qcum[nrand+1],n)
+      TT<-rbind(cbind(x,z),cbind(OO1,I))
+      WW<-matrix(0,n+qcum[nrand+1],n+qcum[nrand+1])
+      WW[c(1:n),]<-cbind(W1,Null1)
+      WW[c((n+1):(n+qcum[nrand+1])),]<-cbind(Null2,W2)   
+      PP<-TT%*%solve(t(TT)%*%WW%*%TT)%*%t(TT)%*%WW
+      leverage<-rep(0,n)
+      for (kk in 1:n) leverage[kk]<-PP[kk,kk]
+      resp_disp<-deviance_residual/(1-leverage)
+      weight_disp<-(1-leverage)/2
+##############################################################
+######### GLM fit for phi #####################
+##############################################################
+      resglm_disp<-glm(resp_disp~1,family=Gamma(link="log"),weights=weight_disp)
+      inv_disp<-1/resglm_disp$fitted.values
+      disp_est<-resglm_disp$fitted.values
+      phi<-disp_est
+    if (RespDist == "poisson") {
+        dhdphi<- sum(-1/phi+mu/phi^2+y*log(phi)/phi^2-y/phi^2+digamma(y/phi+1)*y/phi^2)
+        d2hdphi<- sum(1/phi^2-2*mu/phi^3-2*y*log(phi)/phi^3+y/phi^3+2*y/phi^3-trigamma(y/phi+1)*y^2/phi^4-digamma(y/phi+1)*2*y/phi^3)
+    }
+##    phi_temp<-phi[1]-dhdphi/d2hdphi/10
+##    phi<-rep(phi_temp,n)
+##    disp_est<-phi
+    print(phi[1])
+    convergence2<-sum(abs(disp_est-old_disp_est))
+    old_disp_est<-disp_est
+  }
     if (RespDist=="gaussian") {
         temp5<- dmudeta^2 /(Vmu)
         dW1dphi<-diag(-as.vector(temp5)/phi^2)
@@ -417,7 +482,7 @@ for(k in 1:Iter_mean) {
         convergence1<-convergence1+convergence2
         print_err<-print_err+convergence2
     }
-##    print(print_err)
+##        print(print_err)
 }
 ###############################################################
 ############# se for dispersion estimates######################
@@ -483,13 +548,28 @@ for(k in 1:Iter_mean) {
     H<-t(z)%*%W1%*%z+W2
     A<-rbind(cbind((t(X)%*%W1%*%X),(t(X)%*%W1%*%z%*%I)),cbind((t(I)%*%t(z)%*%W1%*%X),H))
     if (RespDist=="gaussian") hlikeli<-sum(-0.5*(y-mu)*(y-mu)/phi-0.5*log(2*pi*phi))
-    if (RespDist=="poisson") hlikeli<-sum(y*log(mu)-mu-log(factorial(y)))
+    if (RespDist=="poisson") hlikeli<-sum(y*log(mu)-mu-lgamma(y+1))
+    if (ODEst==TRUE && RespDist=="poisson") {
+          hlikeli<-sum(-log(phi)-mu/phi+(y/phi)*log(mu/phi)-lgamma(y/phi+1))
+          y_zero<-1*(y==0)
+          hlikeli<-hlikeli+0.5*sum(y_zero*log(phi))         
+          hlikeli<-sum(-0.5*log(phi)-mu/phi-y+y*log(y+0.00001)-lgamma(y+1)+y/phi*(1+log(mu))-y/phi*log(y+0.00001))
+    }
     if (RespDist=="binomial") hlikeli<-sum(y*log(mu)+(1-y)*log(1-mu))
     if (RespDist=="gamma") hlikeli<-sum(log(y)/phi-log(y)-y/(phi*mu)-log(phi)/phi-log(mu)/phi-lgamma(1/phi))
-    hlikeli1<--2*hlikeli
-    hlikeli<-hlikeli-0.5*t(v_h)%*%W2%*%v_h-0.5*nrow(W2)*log(2*pi)-0.5*log(abs(det(solve(W2))))
-    pvh<-hlikeli-0.5*log(abs(det(-d2hdv2/(2*pi))))
-    pbvh<-hlikeli-0.5*log(abs(det(A/(2*pi))))
+    AA<-rbind(cbind((t(x)%*%W1%*%x),(t(x)%*%W1%*%z)),cbind((t(z)%*%W1%*%x),(-1*d2hdv2)))
+    BB<-rbind(cbind((t(x)%*%W1%*%x),(t(x)%*%W1%*%z)),cbind((t(z)%*%W1%*%x),(t(z)%*%W1%*%z)))
+    pd<- sum(diag(solve(AA) %*% BB))    
+    caic<--2*hlikeli+2*pd
+    cc1<-svd(W2)
+    logdet1<-sum(log(abs(1/cc1$d)))
+    hlikeli<-hlikeli-0.5*t(v_h)%*%W2%*%v_h-0.5*logdet1-0.5*log(2*pi*nrow(W2))
+    cc1<-svd(-d2hdv2)
+    logdet1<-sum(log(abs(cc1$d)))
+    pvh<-hlikeli-0.5*logdet1+0.5*log(2*pi*nrow(d2hdv2))
+    cc1<-svd(A)
+    logdet1<-sum(log(abs(cc1$d)))
+    pbvh<-hlikeli-0.5*logdet1+0.5*log(2*pi*nrow(A))
     m2h<--2*hlikeli
     m2pvh<--2*pvh
     m2pbvh<--2*pbvh
@@ -501,47 +581,56 @@ for(k in 1:Iter_mean) {
     beta_coeff<-cbind(beta_h,se_beta,z_beta)
     colnames(beta_coeff) <- c("Estimate", "Std. Error", "t-value")
     rownames(beta_coeff) <- namesX
-##    print("Estimates from the mean model")    
-##    print(beta_coeff,4)
+    print("Estimates from the mean model")    
+    print(beta_coeff,4)
     if (RespDist=="gaussian") {    
-##        print("Estimates from the dispersion model for Phi")    
+        print("Estimates from the dispersion model for Phi")    
         se_phi<-sqrt(-1/d2REMLd2phi)
         phi_coeff<-cbind(phi[1],se_phi)
         colnames(phi_coeff) <- c("Estimate", "Std. Error")
         rownames(phi_coeff) <- "phi"
-##        print(phi_coeff,4)
+        print(phi_coeff,4)
     }
     if (RespDist=="gamma") {    
-##        print("Estimates from the dispersion model for Phi")    
+        print("Estimates from the dispersion model for Phi")    
         se_phi<-sqrt(-1/d2REMLd2phi)
         phi_coeff<-cbind(phi[1],se_phi)
         colnames(phi_coeff) <- c("Estimate", "Std. Error")
         rownames(phi_coeff) <- "phi"
-##        print(phi_coeff,4)
+        print(phi_coeff,4)
     }
-##    if (spatial=="IAR" && !is.null(Neighbor)) print("Estimates from the dispersion model for Lambda in the IAR model")
-##    else print("Estimates from the dispersion model for Lambda")
+    if (ODEst==TRUE) {
+        print("Estimates from the dispersion model for Phi")    
+##        res2<-summary(resglm_disp)
+##        se_phi<-phi[1]*phi[1]*res2$coefficients[2]
+        se_phi<-sqrt(abs(-1/d2hdphi))
+        phi_coeff<-cbind(phi[1],se_phi)
+        colnames(phi_coeff) <- c("Estimate", "Std. Error")
+        rownames(phi_coeff) <- "phi"
+        print(phi_coeff,4)
+    }
+        if (spatial=="IAR" && !is.null(Neighbor)) print("Estimates from the dispersion model for Lambda in the IAR model")
+       else print("Estimates from the dispersion model for Lambda")
     se_lam<-clam_se[1,1]
     z_lam<-lam/se_lam
     lam_coeff<-cbind(lam,se_lam)
     colnames(lam_coeff) <- c("Estimate", "Std. Error")
     rownames(lam_coeff) <- namesRE
-##     print(lam_coeff,4)
+    print(lam_coeff,4)
     if (spatial=="MRF" && !is.null(Neighbor)) {
-##        print("Estimates for rho in the MRF model")
+        print("Estimates for rho in the MRF model")
         se_rho<-clam_se[2,1]
         z_rho<-rho/se_rho
         rho_coeff<-cbind(rho,se_rho)
         colnames(rho_coeff) <- c("Estimate", "Std. Error")
         rownames(rho_coeff) <- "rho"
-##        print(rho_coeff,4)
-    } else se_rho<-0.0001
+        print(rho_coeff,4)
+    }
 ###############################################################
 ############# Likelihoods         ###########################
 ###############################################################
-    if (dord<=1) like_value<-cbind(m2h,m2pvh,m2pbvh)
-    if (dord<=1) colnames(like_value) <- c("-2*h","-2*p_v(h)","-2p_b,v(h)")
-##    print(like_value)
+    if (dord<=1) like_value<-cbind(m2h,m2pvh,m2pbvh,caic)
+    if (dord<=1) colnames(like_value) <- c("-2*h","-2*p_v(h)","-2p_b,v(h)","cAIC")
     if (RespDist=="gaussian") deviance_residual<-(y-mu)^2
     if (RespDist=="poisson") {
        y_zero<-1*(y==0)
@@ -553,10 +642,21 @@ for(k in 1:Iter_mean) {
        deviance_residual<-2*y*log((y+0.000001)/mu)+2*(BinomialDen-y)*log((BinomialDen-y+0.000001)/(BinomialDen-mu))
     }
     if (RespDist=="gamma") deviance_residual<-2*(-log(y/mu)+(y-mu)/mu)
-    if (RespDist=="gaussian") mean_residual<-sign(y-mu)*sqrt(deviance_residual)*sqrt(1/phi)
-    if (RespDist=="poisson") mean_residual<-sign(y-mu)*sqrt(deviance_residual)
-    if (RespDist=="binomial") mean_residual<-sign(y-mu)*sqrt(deviance_residual)
-    if (RespDist=="gamma") mean_residual<-sign(y-mu)*sqrt(deviance_residual)*sqrt(1/phi)
-    res<-list(namesX,beta_h,se_beta,lam,rho,clam_se,v_h,like_value,hlikeli1,mu,W2,se_lam,se_rho,A,mean_residual)
+      OO1<-matrix(0,qcum[nrand+1],p)
+      Null1<-matrix(0,n,qcum[nrand+1])
+      Null2<-matrix(0,qcum[nrand+1],n)
+      TT<-rbind(cbind(x,z),cbind(OO1,I))
+      WW<-matrix(0,n+qcum[nrand+1],n+qcum[nrand+1])
+      WW[c(1:n),]<-cbind(W1,Null1)
+      WW[c((n+1):(n+qcum[nrand+1])),]<-cbind(Null2,W2)   
+      PP<-TT%*%solve(t(TT)%*%WW%*%TT)%*%t(TT)%*%WW
+      leverage<-rep(0,n)
+      for (kk in 1:n) leverage[kk]<-PP[kk,kk]
+    if (RespDist=="gaussian") mean_residual<-sign(y-mu)*sqrt(deviance_residual)*sqrt(inv_disp)/sqrt(1-leverage)
+    if (RespDist=="poisson") mean_residual<-sign(y-mu)*sqrt(deviance_residual)/sqrt((1-leverage))
+    if (RespDist=="binomial") mean_residual<-sign(y-mu)*sqrt(deviance_residual)/sqrt((1-leverage))
+    if (RespDist=="gamma") mean_residual<-sign(y-mu)*sqrt(deviance_residual)*sqrt(inv_disp)/(sqrt(1-leverage))
+    print(like_value)
+    res<-list(mean_residual=mean_residual,mu=mu,namesX=namesX,beta_h=beta_h,se_beta=se_beta,lam=lam,eta_mu=eta,rho=rho,clam_se=clam_se,v_h=v_h,like_value=like_value)
     return(res)
 }

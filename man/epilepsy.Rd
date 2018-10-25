@@ -1,6 +1,6 @@
-\name{data_epilepsy}
+\name{epilepsy}
 \Rdversion{1.5}
-\alias{data_epilepsy}
+\alias{epilepsy}
 
 \docType{package}
 
@@ -14,7 +14,7 @@ period preceding the trial (B), the logarithm of age (A), and visit (V: a linear
 A multivariate response variable (y) consists of the seizure counts during 2-week periods before each of four
 visits to the clinic.}
 
-\usage{data(data_epilepsy)}
+\usage{data(epilepsy)}
 
 \format{
   A data frame with 236 observations of the following 7 variables.

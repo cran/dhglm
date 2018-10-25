@@ -1,4 +1,5 @@
-plotdhglm<-function (OUTPUT,type="mean",random=NULL) {
+plotdhglm <-
+function (OUTPUT,type="mean",random=NULL) {
     random=NULL
     par(mfrow=c(2,2))
     if (type=="mean") {
@@ -17,15 +18,19 @@ plotdhglm<-function (OUTPUT,type="mean",random=NULL) {
 	    mu<-OUTPUT[24][[1]]
 	    StudentResidual<-OUTPUT[5][[1]]
     }
+    if (type=="alpha") {
+	    mu<-OUTPUT[32][[1]]
+	    StudentResidual<-OUTPUT[31][[1]]
+    }
     x<-mu
     y<-StudentResidual
     fit<- supsmu(x,y)
-    plot(x, y, main="Residuals vs. Fitted", xlab="scaled fitted values", ylab="Studentized Residual", cex=0.5) #plot data point
+    plot(x, y, main="Residuals vs Fitted", xlab="scaled fitted values", ylab="Studentized Residual", cex=0.5) #plot data point
     lines(fit$x, fit$y) #plot smooth spline fit
     y<-abs(StudentResidual)
     fit<- supsmu(x,y)
-    plot(x, y, main="Residuals vs. Fitted",xlab="scaled fitted values", ylab="|Studentized Residual|", cex=0.5) #plot data point
+    plot(x, y, main="|Residuals| vs Fitted",xlab="scaled fitted values", ylab="|Studentized Residual|", cex=0.5) #plot data point
     lines(fit$x, fit$y) #plot smooth spline fit
     qqnorm(StudentResidual,main="Normal Probability Plot"); qqline(StudentResidual) # Normal probability plot
-    hist(StudentResidual,main="Histogram of Student Residual",xlab="Student Residual")
+    hist(StudentResidual,main="Histogram of Student Redidual")
 }

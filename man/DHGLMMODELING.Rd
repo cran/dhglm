@@ -1,5 +1,5 @@
 \name{DHGLMMODELING}
-\Rdversion{1.1}
+\Rdversion{2.0}
 \alias{DHGLMMODELING}
 
 \docType{package}
@@ -16,10 +16,13 @@ that is used as a post-multiplier for the Z matrix of the corresponding random t
 }
 
 \usage{
-DHGLMMODELING(Model="mean",Link=NULL,LinPred="constant",RandDist=NULL,
-Offset=NULL,LMatrix=NULL,LinkRandVariance=NULL,LinPredRandVariance=NULL,
-RandDistRandVariance="gaussian",
-LinkRandVariance2=NULL,LinPredRandVariance2=NULL)}
+DHGLMMODELING(Model = "mean", Link = NULL, LinPred = "constant",
+                 RandDist = NULL, Offset = NULL, LMatrix = NULL,
+                 LinkRandVariance = NULL, LinPredRandVariance = NULL,
+                 RandDistRandVariance = "gaussian", LinkRandVariance2 =
+                 NULL, LinPredRandVariance2 = NULL, corr = NULL,
+                 spatial = NULL, longitude = NULL, latitude = NULL,
+                 spline = NULL, Neighbor = NULL)}
 
 \arguments{
 \item{Model}{This option specifies a GLM, HGLM or DHGLM model for mu when Model="mean" (default), 
@@ -92,6 +95,20 @@ For example, when LinPredRandVariance=c(lambda~xx1+(1|id11),lambda~xx1+(1|id12))
 is specified, LinPredRandVariance2=c(~xxx1,~xxx2) specifies
 xxx1 and xxx2 as fixed covariates for the linear predictor of random-effect variances for id11 and id12, respectively.
 The default (NULL) is set to constant variance for the random effects in LinPredRandVariance.}
+
+\item{corr}{Speicification of correlation structures.}
+
+\item{spatial}{Speicification of spatial model.}
+
+\item{longitude}{variable for longitude when spatial option is TRUE.}
+
+\item{latitude}{variable for latitude when spatial option is TRUE.}
+
+\item{spline}{option for splince smoothing.}
+
+\item{Neighbor}{Neiborhood matrix when spatial option is TRUE.}
+
+
 }
 
 

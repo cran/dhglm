@@ -1,4 +1,4 @@
-expandSlash <- 
+expandSlash <-
 function (bb) 
 {
     if (!is.list(bb)) 

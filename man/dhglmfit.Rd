@@ -1,5 +1,5 @@
 \name{dhglmfit}
-\Rdversion{1.5}
+\Rdversion{2.0}
 \alias{dhglmfit}
 
 \docType{package}
@@ -13,10 +13,11 @@ To call the fitting function dhglmfit, models for the mean and dispersion must b
 by DHGLMMODELING object preferably created by calling the DHGLMMODELING function.}
 
 \usage{
-dhglmfit(RespDist="gaussian",BinomialDen=NULL, DataMain, MeanModel=,
-DispersionModel=,BetaFix=NULL,PhiFix=NULL,LamFix=NULL,mord=0,dord=1,
-REML=TRUE,Maxiter=200,
-convergence=1e-06,EstCorr=TRUE,Dmethod="deviance")
+dhglmfit(RespDist = "gaussian", BinomialDen = NULL, DataMain,
+                 MeanModel, DispersionModel, BetaFix = NULL, PhiFix =
+                 NULL, LamFix = NULL, mord = 1, dord = 1, REML = TRUE,
+                 Maxiter = 200, convergence = 1e-06, EstCorr = FALSE,
+                 Dmethod = "deviance")
 }
 
 \arguments{
@@ -46,48 +47,48 @@ convergence=1e-06,EstCorr=TRUE,Dmethod="deviance")
 
 \examples{
 #### Analysis of crack-growth data ####
-data(data_crack_growth)
+data(crack_growth)
 ## GLM ##
 model_mu<-DHGLMMODELING(Model="mean", Link="log", 
 LinPred=y~crack0)
 model_phi<-DHGLMMODELING(Model="dispersion")
-res_glm<-dhglmfit(RespDist="gamma",DataMain=data_crack_growth,
+res_glm<-dhglmfit(RespDist="gamma",DataMain=crack_growth,
 MeanModel=model_mu,DispersionModel=model_phi,Maxiter=1)
 ## JGLM ##
 model_mu<-DHGLMMODELING(Model="mean", Link="log",
 LinPred=y~crack0)
 model_phi<-DHGLMMODELING(Model="dispersion", Link="log", 
 LinPred=phi~cycle)
-res_jglm<-dhglmfit(RespDist="gamma",DataMain=data_crack_growth,
+res_jglm<-dhglmfit(RespDist="gamma",DataMain=crack_growth,
 MeanModel=model_mu,DispersionModel=model_phi,Maxiter=1)
 ## HGLM I ##
 model_mu<-DHGLMMODELING(Model="mean", Link="log", 
 LinPred=y~crack0+(1|specimen),RandDist="inverse-gamma")
 model_phi<-DHGLMMODELING(Model="dispersion")
-res_hglm1<-dhglmfit(RespDist="gamma",DataMain=data_crack_growth,
+res_hglm1<-dhglmfit(RespDist="gamma",DataMain=crack_growth,
 MeanModel=model_mu,DispersionModel=model_phi,Maxiter=1)
 ## HGLM II ##
 model_mu<-DHGLMMODELING(Model="mean", Link="log", 
 LinPred=y~crack0+(1|specimen),RandDist="inverse-gamma")
 model_phi<-DHGLMMODELING(Model="dispersion", Link="log", 
 LinPred=phi~cycle)
-res_hglm2<-dhglmfit(RespDist="gamma",DataMain=data_crack_growth,
+res_hglm2<-dhglmfit(RespDist="gamma",DataMain=crack_growth,
 MeanModel=model_mu,DispersionModel=model_phi,Maxiter=1)
 ## DHGLM I ##
 model_mu<-DHGLMMODELING(Model="mean", Link="log",
  LinPred=y~crack0+(1|specimen),RandDist="inverse-gamma")
 model_phi<-DHGLMMODELING(Model="dispersion", Link="log", 
 LinPred=phi~cycle+(1|specimen),RandDist="gaussian")
-res_dhglm1<-dhglmfit(RespDist="gamma",DataMain=data_crack_growth,
+res_dhglm1<-dhglmfit(RespDist="gamma",DataMain=crack_growth,
 MeanModel=model_mu,DispersionModel=model_phi,Maxiter=1)
 
 #### Analysis of epilepsy data ####
-data(data_epilepsy)
+data(epilepsy)
 model_mu<-DHGLMMODELING(Model="mean", Link="log", 
 LinPred=y~B+T+A+T*B+V+(1|patient),
 RandDist=c("gaussian"))
 model_phi<-DHGLMMODELING(Model="dispersion")
-# res_hglm<-dhglmfit(RespDist="poisson",DataMain=data_epilepsy,
+# res_hglm<-dhglmfit(RespDist="poisson",DataMain=epilepsy,
 # MeanModel=model_mu,DispersionModel=model_phi,Maxiter=1)
 }
 

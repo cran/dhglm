@@ -1,5 +1,5 @@
 \name{plotdhglm}
-\Rdversion{1.7}
+\Rdversion{2.0}
 \alias{plotdhglm}
 
 \docType{package}
@@ -15,7 +15,7 @@ plotdhglm(OUTPUT, type="mean", random=NULL)
 \arguments{
   \item{OUTPUT}{The <\code{\link{dhglmfit}}> object to be plotted}
   \item{type}{Type of model required (mean, dispersion)}
-  \item{random}{Random term whose residuals are to be plotted. Default (NULL) is the residuals from the full model}
+  \item{random}{Random term whose residuals are to be plotted (mean, phi, v, alpha). Default (NULL) is the residuals from the full model}
 }
 
 \details{
@@ -30,12 +30,12 @@ residuals versus fitted values and absolute values of residuals versus fitted va
 
 \examples{
 #### Model checking plot for crack-growth data
-data(data_crack_growth)
+data(crack_growth)
 model_mu<-DHGLMMODELING(Model="mean", Link="log", 
 LinPred=y~crack0+(1|specimen),RandDist="inverse-gamma")
 model_phi<-DHGLMMODELING(Model="dispersion", Link="log", 
 LinPred=phi~cycle+(1|specimen),RandDist="gaussian")
-res_crack_dhglm1<-dhglmfit(RespDist="gamma", DataMain=data_crack_growth, 
+res_crack_dhglm1<-dhglmfit(RespDist="gamma", DataMain=crack_growth, 
 MeanModel=model_mu, DispersionModel=model_phi,Maxiter=1)
 plotdhglm(res_crack_dhglm1)
 }

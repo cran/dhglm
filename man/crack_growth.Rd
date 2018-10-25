@@ -1,6 +1,6 @@
-\name{data_crack_growth}
+\name{crack_growth}
 \Rdversion{1.5}
-\alias{data_crack_growth}
+\alias{crack_growth}
 %\alias{dhglm.h}
 
 \docType{package}
@@ -13,11 +13,12 @@ for j=1,...,12 coded by cycle. The crack increment sequences look rather irregul
 observation and let y(i,j)=l(i,j)-l(i,j-1) be the corresponding increment of crack length, which has always a positive value. l(i,j-1) is coded by
 crack0 to use as a covariate.}
 
-\usage{data(data_crack_growth)}
+\usage{data(crack_growth)}
 
 \format{
   A data frame with 241 observations of the following 4 variables.
   \describe{
+    \item{\code{ID}}{ID variable.} 
     \item{\code{y}}{Increment in crack length, y(i,j)=l(i,j)-l(i,j-1), where l(i,j) is the crack length of the ith 
     specimen at the jth observation.}
     \item{\code{crack0}}{The previous crack length, l(i,j-1).}

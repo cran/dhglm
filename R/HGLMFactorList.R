@@ -29,13 +29,13 @@ function (formula, fr, rmInt, drop)
             mf)
         if (rmInt) {
             if (is.na(icol <- match("(Intercept)", colnames(mm)))) 
-                break
+#                break
             if (ncol(mm) < 2) 
                 stop("lhs of a random-effects term cannot be an intercept only")
             mm <- mm[, -icol, drop = FALSE]
         }
-        ans <- list(f = ff, A = do.call(rBind, lapply(seq_len(ncol(mm)), 
-            function(j) im)), Zt = do.call(rBind, lapply(seq_len(ncol(mm)), 
+        ans <- list(f = ff, A = do.call(rbind, lapply(seq_len(ncol(mm)), 
+            function(j) im)), Zt = do.call(rbind, lapply(seq_len(ncol(mm)), 
             function(j) {
                 im@x <- mm[, j]
                 im
